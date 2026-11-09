@@ -1,0 +1,16 @@
+make: Entering directory '/home/dmvo/Projects/linux-rosco'
+make[1]: Entering directory '/home/dmvo/Projects/rosco-linux/out/linux'
+  CC      init/do_mounts.o
+  AR      init/built-in.a
+  AR      built-in.a
+  AR      built-in-fixup.a
+  COPY    vmlinux.a
+  LD      vmlinux.o
+  MODPOST vmlinux.symvers
+  LD      vmlinux.unstripped
+  SYSMAP  System.map
+  OBJCOPY vmlinux
+  GEN     modules.builtin.modinfo
+  GEN     modules.builtin
+make[1]: Leaving directory '/home/dmvo/Projects/rosco-linux/out/linux'
+make: Leaving directory '/home/dmvo/Projects/linux-rosco'

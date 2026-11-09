@@ -1,0 +1,70 @@
+
+[1;33m                                 ___ ___ _   
+ ___ ___ ___ ___ ___       _____|  _| . | |_ 
+|  _| . |_ -|  _| . |     |     | . | . | '_|
+|_| |___|___|___|___|_____|_|_|_|___|___|_,_|
+                    |_____|[1;37m      Classic [1;30m2.42[0m
+
+MC68010 CPU @ 8.0MHz with 1048576 bytes RAM
+Initializing hard drives... No IDE interface found
+Searching for boot media...
+No bootable media found
+Ready for Kermit receiveKernel received okay; Starting...
+
+
+ROSCO-RAM-READY
+
+[host: CRC-checked 762916 bytes; 0 retries]
+
+RAM loader: entering Linux
+Linux version 7.3.0-rosco+ (dmvo@mbp) (m68k-elf-rosco-gcc (GCC) 13.3.1 20240927, GNU ld (GNU Binutils) 2.42) #5 Thu Oct 22 20:36:43 EEST 2026
+printk: legacy bootconsole [earlyrosco0] enabled
+uClinux with CPU MC68010
+Flat model support (C) 1998,1999 Kenneth Albanowski, D. Jeff Dionne
+Zone ranges:
+  DMA      [mem 0x0000000000000000-0x00000000000fffff]
+  Normal   empty
+Movable zone start for each node
+Early memory node ranges
+  node   0: [mem 0x0000000000000000-0x00000000000fffff]
+Initmem setup node 0 [mem 0x0000000000000000-0x00000000000fffff]
+On node 0, zone DMA: 768 pages in unavailable ranges
+Kernel command line: console=earlyrosco keep_bootcon loglevel=8 panic=0
+printk: debug: skip boot console de-registration.
+printk: log buffer data + meta data: 4096 + 12800 = 16896 bytes
+Dentry cache hash table entries: 1024 (order: 0, 4096 bytes, linear)
+Inode-cache hash table entries: 1024 (order: 0, 4096 bytes, linear)
+Built 1 zonelists, mobility grouping off.  Total pages: 256
+mem auto-init: stack:off, heap alloc:off, heap free:off
+SLUB: HWalign=16, Order=0-1, MinObjects=0, CPUs=1, Nodes=1
+NR_IRQS: 32
+clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 19112604462750000 ns
+Calibrating delay loop... 0.44 BogoMIPS (lpj=2228)
+pid_max: default: 4096 minimum: 301
+Mount-cache hash table entries: 1024 (order: 0, 4096 bytes, linear)
+Mountpoint-cache hash table entries: 1024 (order: 0, 4096 bytes, linear)
+VFS: Finished mounting rootfs on nullfs
+bringup: vfs caches ready
+bringup: rest_init
+bringup: cloned init: 1
+bringup: cloned kthreadd: 2
+
+[tick pc/jiffies/pid/free] 000057ba ffff8cc4 00000001 0000000f 
+
+[tick pc/jiffies/pid/free] 000057ba ffff8eb8 00000001 0000000f 
+
+[tick pc/jiffies/pid/free] 00009a0a ffff90ac 00000001 0000000f 
+
+[tick pc/jiffies/pid/free] 00009a0a ffff92a0 00000001 0000000f 
+
+[tick pc/jiffies/pid/free] 00009a0a ffff9494 00000001 0000000f 
+
+[tick pc/jiffies/pid/free] 00009a0a ffff9688 00000001 0000000f 
+
+[tick pc/jiffies/pid/free] 00009a0a ffff987c 00000001 0000000f 
+
+[tick pc/jiffies/pid/free] 00009a0a ffff9a70 00000001 0000000f 
+
+[tick pc/jiffies/pid/free] 00009a0a ffff9c64 00000001 0000000f 
+
+[tick pc/jiffies/pid/free] 00009a0a ffff9e58 00000001 0000000f 

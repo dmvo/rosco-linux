@@ -1,0 +1,160 @@
+    0.000 
+    0.000 RAM loader: entering Linux
+    0.069 Linux version 7.3.0-rosco+ (dmvo@mbp) (m68k-elf-rosco-gcc (GCC) 13.3.1 20240927, GNU ld (GNU Binutils) 2.42) #6 Thu Oct 22 20:51:35 EEST 2026
+    0.069 printk: legacy bootconsole [earlyrosco0] enabled
+    0.069 uClinux with CPU MC68010
+    0.094 Flat model support (C) 1998,1999 Kenneth Albanowski, D. Jeff Dionne
+    0.094 Zone ranges:
+    0.109   DMA      [mem 0x0000000000000000-0x00000000000fffff]
+    0.125   Normal   empty
+    0.141 Movable zone start for each node
+    0.157 Early memory node ranges
+    0.173   node   0: [mem 0x0000000000000000-0x00000000000fffff]
+    0.189 Initmem setup node 0 [mem 0x0000000000000000-0x00000000000fffff]
+    0.384 Kernel command line: console=earlyrosco keep_bootcon loglevel=8 panic=0 dhash_entries=128 ihash_entries=128 mhash_entries=64 mphash_entries=64
+    0.398 printk: debug: skip boot console de-registration.
+    0.548 printk: log buffer data + meta data: 4096 + 12800 = 16896 bytes
+    0.578 Dentry cache hash table entries: 128 (order: 0, 512 bytes, linear)
+    0.600 Inode-cache hash table entries: 128 (order: 0, 512 bytes, linear)
+    0.619 Built 1 zonelists, mobility grouping off.  Total pages: 256
+    0.632 mem auto-init: stack:off, heap alloc:off, heap free:off
+    0.808 SLUB: HWalign=16, Order=0-1, MinObjects=0, CPUs=1, Nodes=1
+    0.984 NR_IRQS: 32
+    1.117 clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 76450417851000000 ns
+    1.710 Calibrating delay loop... 0.77 BogoMIPS (lpj=15552)
+    1.725 pid_max: default: 4096 minimum: 301
+    1.835 Mount-cache hash table entries: 64 (order: 0, 256 bytes, linear)
+    1.866 Mountpoint-cache hash table entries: 64 (order: 0, 256 bytes, linear)
+    1.994 VFS: Finished mounting rootfs on nullfs
+    2.058 bringup: vfs caches ready
+    2.154 bringup: rest_init
+    2.234 bringup: cloned init: 1
+    2.282 bringup: cloned kthreadd: 2
+    2.298 bringup: kernel_init_freeable
+    3.439 Memory: 36K/1024K available (579K kernel code, 52K rwdata, 60K rodata, 52K init, 21K bss, 820K reserved, 0K cma-reserved)
+    4.110 swapper/0 invoked oom-killer: gfp_mask=0x40cc0(GFP_KERNEL|__GFP_COMP), order=0, oom_score_adj=0
+    4.136 CPU: 0 UID: 0 PID: 1 Comm: swapper/0 Not tainted 7.3.0-rosco+ #6 NONE 
+    4.471 Stack from 000d0c80:
+    4.471         000d0c80 00098bfe 00098bfe 00040cc0 7fffffff 00039790 00003696 00098bfe
+    4.471         00002614 00040cc0 7fffffff 00039790 000398e2 000d0d64 000a3180 000a3390
+    4.471         0003975c 000d0cf8 00039dae 000d0d64 00040cc0 00000000 00000840 00000000
+    4.471         00000000 000d0d4a 0004704a 000adfdc 00000000 00000000 000d0d88 00048734
+    4.471         000d0d64 ffffffff 00000001 ffffffff 00000001 00000000 000d0e28 000c2480
+    4.487         000493ce 000fc0c0 00000000 000adfe4 00000001 00000000 00010000 04000000
+    4.503 Call Trace:
+    4.503         [<00040cc0>] 0x00040cc0
+    4.521  [<00039790>] 0x00039790
+    4.535  [<00003696>] 0x00003696
+    4.551  [<00002614>] 0x00002614
+    4.551  [<00040cc0>] 0x00040cc0
+    4.567 
+    4.567         [<00039790>] 0x00039790
+    4.583  [<000398e2>] 0x000398e2
+    4.599  [<0003975c>] 0x0003975c
+    4.615  [<00039dae>] 0x00039dae
+    4.631  [<00040cc0>] 0x00040cc0
+    4.647 
+    4.647         [<0004704a>] 0x0004704a
+    4.663  [<00048734>] 0x00048734
+    4.679  [<000493ce>] 0x000493ce
+    4.679  [<00010000>] 0x00010000
+    4.696  [<0000ffff>] 0x0000ffff
+    4.711 
+    4.711         [<00010000>] 0x00010000
+    4.727  [<00040cc0>] 0x00040cc0
+    4.743  [<00049444>] 0x00049444
+    4.759  [<00040cc0>] 0x00040cc0
+    4.775  [<00040cc0>] 0x00040cc0
+    4.791 
+    4.791         [<000494f8>] 0x000494f8
+    4.807  [<00040cc0>] 0x00040cc0
+    4.823  [<000498f8>] 0x000498f8
+    4.823  [<0008af6c>] 0x0008af6c
+    4.839  [<00046eac>] 0x00046eac
+    4.855 
+    4.855         [<00049aa6>] 0x00049aa6
+    4.871  [<00049f6e>] 0x00049f6e
+    4.887  [<00085860>] 0x00085860
+    4.903  [<00085860>] 0x00085860
+    4.920  [<00085908>] 0x00085908
+    4.935 
+    4.935         [<0008af6c>] 0x0008af6c
+    4.952  [<00014586>] 0x00014586
+    4.967  [<00085560>] 0x00085560
+    4.967  [<00085aca>] 0x00085aca
+    4.983  [<000856f0>] 0x000856f0
+    4.999 
+    4.999         [<00081c8a>] 0x00081c8a
+    5.016  [<00002200>] 0x00002200
+    5.034  [<000b8b34>] 0x000b8b34
+    5.047  [<000af87c>] 0x000af87c
+    5.064  [<0008af6c>] 0x0008af6c
+    5.079 
+    5.079         [<00014586>] 0x00014586
+    5.096  [<00002200>] 0x00002200
+    5.111  [<00002200>] 0x00002200
+    5.111  [<00020002>] 0x00020002
+    5.127  [<000afbac>] 0x000afbac
+    5.145 
+    5.145         [<000afc28>] 0x000afc28
+    5.159  [<000b8b26>] 0x000b8b26
+    5.175  [<0008fe9e>] 0x0008fe9e
+    5.191  [<0008feb8>] 0x0008feb8
+    5.207  [<0000425c>] 0x0000425c
+    5.207 
+    5.223 Mem-Info:
+    5.308 active_anon:0 inactive_anon:0 isolated_anon:0
+    5.308  active_file:0 inactive_file:0 isolated_file:0
+    5.308  unevictable:0 dirty:0 writeback:0
+    5.308  slab_reclaimable:0 slab_unreclaimable:31
+    5.308  mapped:0 shmem:0 pagetables:0
+    5.308  sec_pagetables:0 bounce:0
+    5.308  kernel_misc_reclaimable:0
+    5.308  free:8 free_pcp:0 free_cma:0
+    5.386 Node 0 active_anon:0kB inactive_anon:0kB active_file:0kB inactive_file:0kB unevictable:0kB isolated(anon):0kB isolated(file):0kB mapped:0kB dirty:0kB writeback:0kB shmem:0kB kernel_stack:40kB pagetables:0kB sec_pagetables:0kB all_unreclaimable? no Balloon:0kB gpu_active:0kB gpu_reclaim:0kB
+    5.487 DMA free:32kB boost:0kB min:128kB low:160kB high:192kB reserved_highatomic:0kB free_highatomic:0kB active_anon:0kB inactive_anon:0kB active_file:0kB inactive_file:0kB unevictable:0kB writepending:0kB zspages:0kB present:1024kB managed:204kB mlocked:0kB bounce:0kB free_pcp:0kB local_pcp:0kB free_cma:0kB
+    5.519 lowmem_reserve[]: 0 0 0
+    5.646 DMA: 0*4kB 0*8kB 0*16kB 1*32kB (U) 0*64kB 0*128kB 0*256kB 0*512kB 0*1024kB = 32kB
+    5.662 0 total pagecache pages
+    5.678 256 pages RAM
+    5.678 0 pages HighMem/MovableOnly
+    5.710 205 pages reserved
+    5.710 Tasks state (memory values in pages):
+    5.737 [  pid  ]   uid  tgid total_vm      rss rss_anon rss_file rss_shmem pgtables_bytes swapents oom_score_adj name
+    5.753 Out of memory and no killable processes...
+    5.769 Kernel panic - not syncing: System is deadlocked on memory
+    5.801 ---[ end Kernel panic - not syncing: System is deadlocked on memory ]---
+    7.188 
+    7.188 [tick pc/jiffies/pid/free/isr] 00001772 ffffe331 00000001 00000008 00000051 
+   12.192 
+   12.192 [tick pc/jiffies/pid/free/isr] 00001772 ffffe3ae 00000001 00000008 00000051 
+   17.188 
+   17.188 [tick pc/jiffies/pid/free/isr] 00001774 ffffe42b 00000001 00000008 00000051 
+   22.187 
+   22.187 [tick pc/jiffies/pid/free/isr] 00001772 ffffe4a8 00000001 00000008 00000051 
+   27.187 
+   27.187 [tick pc/jiffies/pid/free/isr] 00001772 ffffe525 00000001 00000008 00000051 
+   32.186 
+   32.186 [tick pc/jiffies/pid/free/isr] 00001772 ffffe5a2 00000001 00000008 00000051 
+   37.188 
+   37.188 [tick pc/jiffies/pid/free/isr] 00001772 ffffe61f 00000001 00000008 00000051 
+   42.186 
+   42.186 [tick pc/jiffies/pid/free/isr] 00001774 ffffe69c 00000001 00000008 00000051 
+   47.186 
+   47.186 [tick pc/jiffies/pid/free/isr] 00001774 ffffe719 00000001 00000008 00000051 
+   52.185 
+   52.185 [tick pc/jiffies/pid/free/isr] 00001774 ffffe796 00000001 00000008 00000051 
+   57.184 
+   57.184 [tick pc/jiffies/pid/free/isr] 00001772 ffffe813 00000001 00000008 00000051 
+   62.184 
+   62.184 [tick pc/jiffies/pid/free/isr] 00001772 ffffe890 00000001 00000008 00000051 
+   67.183 
+   67.183 [tick pc/jiffies/pid/free/isr] 00001772 ffffe90d 00000001 00000008 00000051 
+   72.184 
+   72.184 [tick pc/jiffies/pid/free/isr] 00001774 ffffe98a 00000001 00000008 00000051 
+   77.183 
+   77.183 [tick pc/jiffies/pid/free/isr] 00001774 ffffea07 00000001 00000008 00000051 
+   82.182 
+   82.182 [tick pc/jiffies/pid/free/isr] 00001772 ffffea84 00000001 00000008 00000051 
+   87.183 
+   87.183 [tick pc/jiffies/pid/free/isr] 00001774 ffffeb01 00000001 00000008 00000051 

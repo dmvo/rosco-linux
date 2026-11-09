@@ -1,0 +1,391 @@
+rosco_m68k Linux bring-up — 2026-10-22
+
+Kernel: /home/dmvo/Projects/linux-rosco
+Branch: rosco-mc68010-bringup
+Base: 7be4bc52fd9e0e55dc9a2e0232b89427d2c4b614
+Initial source state: clean except the user's ROSCO_LINUX_HANDOFF.txt.
+No Zephyr code is a source for this port.
+
+Hardware observations
+---------------------
+USB: FTDI USB-UART, /dev/ttyUSB0, 115200 8N1.
+User confirmed RESET; firmware console captured in logs/firmware-20261022-01.log.
+Firmware banner: Classic 2.42, MC68010 at 8.0 MHz, 1048576 bytes RAM.
+No boot media present; firmware enters Kermit loader.
+RAM-only inventory probe compiled and executed on the board.
+Evidence: logs/probe-20261022-01.log, out/probe.elf and out/probe.dis.
+Probe: RAM=0x100000, UART=0xf00001, CPUINFO=0x2001393e,
+       firmware version word=0x60000242, VBR=0.
+The probe read 0x00001df8 at 0x400 instead of the documented SDB magic;
+do not use that magic as a validated boot contract until explained.
+Inventory probe was followed by three real Linux RAM boot attempts.
+The second probe also tested real MC68010 exception frames:
+  word load at 1: format/vector 0x800c, fault address 1, SSW 0x1105;
+  read at 0x800000: format/vector 0x8008, fault address 0x800000.
+Both resumed with a freshly constructed format-0 frame; SP matched its
+pre-fault value. Log: logs/exceptions-20261022-01.log.
+SST stay in their sockets. In-place flash programming has now passed on hardware.
+The loader accepted manufacturer 0xbf and device 0xb6 on both F020 chips.
+User confirmed to continue as far as possible on F020; F040 board not ready.
+
+Implementation in progress
+--------------------------
+Initial kernel path: no-MMU MC68010, RAM kernel at 0x1000, early UART console,
+DUART timer/IRQ entry. This is bring-up scaffolding, not a finished BSP.
+First build uses /opt/rosco/bin/m68k-elf-rosco-gcc 13.3.1.
+Alignment probe passes by inspected generated code. The build emits size_t
+builtin-declaration warnings; this toolchain is not the final Linux ABI choice.
+A separate m68k-linux-gnu toolchain from official GCC 15.2.0 and binutils 2.42
+is now built, with an explicit GCC strict-alignment patch. Generated assembly
+uses byte accesses for packed longs on 68010; relaxed mode and 68020 use wide
+accesses as the negative control. Linux size_t and A0/D0 pointer returns were
+checked. The complete kernel builds without warnings. Repeating build.sh
+produced identical vmlinux, raw image, and configuration SHA256 values.
+
+Real Linux observations
+-----------------------
+logs/linux-20261022-01.log: Linux reaches memory init, tick interrupts,
+delay calibration (0.44 BogoMIPS) and mounting the initial nullfs root.
+logs/linux-20261022-02.log: temporary stage prints show successful creation
+of init (PID 1) and kthreadd (PID 2). Timer samples report current PID 1,
+15 free pages, PC at resume's RTS and later handle_softirqs immediately
+after enabling IRQs. Init has not reached kernel_init_freeable.
+logs/linux-20261022-03.log: with HZ=25, memory-map alignment reduced to
+256 pages, and explicit small VFS hashes, init reaches kernel_init_freeable
+and driver initcalls. The timed log shows 125 ticks every 5.000 seconds.
+This supports the 100 Hz overload diagnosis, but is not a full scheduler test.
+Boot then panics in devlink_class_init because the default 128 KiB minimum
+page reserve exceeds the 32 KiB still free. Managed RAM is 204 KiB; slab
+uses 124 KiB and kernel stacks 40 KiB. An experimental NOMMU watermark cap
+is being tested; it has not yet been evaluated for upstream submission.
+logs/linux-20261022-04.log: the cap sets min/low/high to 12 KiB and boot
+passes the previous failure. It then reaches fcntl_init and runs out of RAM
+again: 12 KiB free, 136 KiB slab and 48 KiB kernel stacks. Reducing the reserve
+alone is insufficient; plan to measure a split RAM/flash image on F020.
+logs/linux-20261022-05d.log: the Linux GCC 15.2 kernel runs on the real board,
+creates PID 1/2 and reaches driver initcalls, then OOMs with 12 KiB free.
+This build has text=647268, data=119312, bss=22277; raw=775428 bytes;
+static RAM ends at 0xc4708. Intentional bad upload CRC was rejected again.
+Earlier 05/05b captures missed the firmware banner; 05d recovered by sending
+Kermit to the already waiting firmware. run.py now checks the expected greeting
+in the UART log as well as C-Kermit's exit code (signal abort can return zero).
+This is not a working userspace boot and no SD has been accessed.
+
+Kernel snapshots: out/attempt-01 through out/attempt-04 contain vmlinux,
+raw image, configuration, sizes and SHA256 hashes. First image was
+762884 bytes with static RAM end 0xc16f8. All images were RAM-only.
+Stock Kermit can only receive 0xb0000 bytes at 0x40000, so loader.S
+first relocates a 494-byte receiver to 0x800. boot.py then sends the kernel
+directly to 0x1000 in 1024-byte CRC32-protected blocks. Transfer takes
+about 72 s at 115200. Deliberate bad CRC was rejected and retried on real
+hardware in attempt 01; attempt 02 transferred with zero retries.
+run.py now supplies the audible reset prompt itself. The new loader additionally
+supports read-only, CRC-checked 512 KiB flash backup; the host requires two
+identical reads before saving it. This command passed on the board in attempt 05d.
+User installed flash-write jumper JP3 and power-cycled for attempt 06c.
+The read-only backup was tested on the board in attempt 05d: two identical
+524288-byte reads, each block CRC checked. Saved as
+out/backups/f020-original-20261022.bin (SHA256 in adjacent .sha256 file):
+5a36a3e4d4b270726d265e4442c1706891f072311016b6be047f5625820bdeeb.
+The first 43858 bytes equal the local Classic 2.42 firmware ROM exactly;
+everything after offset 0xab51 is FF. The upper 384 KiB is therefore empty.
+
+F020 split-image experiment
+--------------------------
+split_xip.py relinks ordinary function sections into 0xe20000..0xe7ffff,
+retaining 0xe00000..0xe1ffff for firmware. The first image has 391530 bytes
+of flash text, 382212 bytes of RAM payload, and static RAM end 0x64708.
+It retains do_notify_resume in RAM because entry.S uses a PC16 BSR to it.
+This is an experimental host linking step, not upstream-ready XIP support.
+Kernel text-address classification now includes the separate flash range.
+Host boundary tests cover generic, ordinary RAM and split configurations,
+including exclusive ends, data/init ranges and the gap below flash.
+Normal entry/init/scheduler sections remain in RAM. The split image ran on the board in attempt 06c.
+
+The new loader has a bounded WFX1 command for paired SST39SF020A chips only.
+It accepts whole 8 KiB logical sector pairs in the upper 384 KiB, buffers and
+CRC-checks each sector before erasing/programming, verifies every word, and
+has no chip-erase command or caller-selected flash address. The host checks
+the protected firmware against its backup, tests one sector first on empty
+flash, reads back the whole flash after the trial and complete update, and
+only then uploads the paired RAM image. A PTY test passed for bad CRC retry,
+first-sector sequencing, complete readback and refusal on protected mismatch.
+Flash programming passed on hardware in attempt 06c, including the first-sector
+trial, intentional CRC rejection, full readback, and firmware preservation.
+build-f020.sh --boot --protected-backup <backup> builds and updates the pair.
+
+Next
+----
+Shared UART/timer handling and SD through the generic SPI/MMC stack are built.
+Validate them on hardware, followed by user syscalls and format-8 user faults.
+SD/root/userspace hardware proof, module sizing and upstream cleanup remain.
+Compilation and RAM probe execution are not evidence of Linux booting.
+
+Attempt 06c: first successful split RAM/flash Linux boot
+------------------------------------------------------
+Log: logs/linux-20261022-06c.log and .timed.log; flash evidence in .flash.json.
+The initial Kermit banner was missed after power cycle; --ready successfully
+loaded the receiver without another reset. One 8 KiB sector-pair trial passed,
+including an intentionally bad CRC and full-array preservation comparison.
+The whole 393216-byte flash payload took 44.5 s with no retries; the entire
+512 KiB array was read back and matched, including original lower 128 KiB.
+RAM payload 382212 bytes took 35.8 s with no retries. Linux completed initcalls,
+freed 52 KiB of init memory, and panicked only because no working init exists
+on the empty root. Tick samples at panic show 102 free pages (408 KiB).
+No OOM occurred. No real serial-input or SD/filesystem/userspace test yet.
+
+Independent storage sizing build: out/storage-sizing + storage-sizing-split.
+Generic SCCNXP TTY, SPI bitbang, MMC SPI/block and ROMFS enabled, but no board
+wiring drivers yet: text=919992, data=153544, bss=24349. Split static RAM end
+720672, leaving 327904 bytes before dynamic allocations. Hardware suitability
+still requires measurement; this sizing image has not been sent to the board.
+
+userspace/build-rootfs.py builds a 356-byte relocation-free m68k FLAT init
+and a 1024-byte ROMFS image using upstream genromfs 0.5.7 pinned by SHA256.
+Two builds produced identical files. init opens /dev/console, prints getpid(),
+and echoes read() data via write(). It is not yet tested on the board.
+
+Attempt 07 prepared: UART + SD + ROMFS
+-------------------------------------
+Snapshot: out/attempt-07. The intermediate RAM link has text=928544,
+data=154260, bss=24357. Its oversized RAM layout is only a linking input.
+The actual split image has 697808 RAM payload bytes, static RAM end 728872
+(0xb1f28), and 390558 bytes of flash text. This leaves 319704 RAM bytes
+above the static kernel, before page rounding and dynamic allocations.
+Generic SCCNXP now has XR68C681 baud support without repurposing its shared
+timer, and a platform IMR callback preserving timer IRQs. The rosco platform
+uses hard shared IRQ 5 for timer and UART. SD uses generic SPI bitbang/MMC SPI
+with DUART pins OP2=CS, OP4=SCK, OP6=MOSI, IP2=MISO, secondary CS OP7 inactive.
+The MMC platform callback caps requests and scatterlists to one 4 KiB page;
+the actual memory and timing effects are not yet measured on the board.
+Root command line: root=/dev/mmcblk0 rootfstype=romfs ro rootwait init=/init.
+Card insertion must precede boot because there is no card-detect wire.
+
+The rootfs builder applies a small alphabetical traversal patch to pinned
+genromfs 0.5.7, so host directory creation order does not change the image.
+Current 1024-byte ROMFS SHA256:
+c276cac3d95fa89c4dce23be7a3737a757a8b99ed32c2260374e1c87f4b6cd21.
+The 356-byte FLAT /init SHA256:
+72216dc24bf981549003abcce5fb242d65635dc28dd191270f93f386375edc4d.
+boot.py --console-test sends a paced line after the userspace prompt and
+requires the explicit userspace read/write reply, with a JSON result journal.
+
+User explicitly authorized overwriting the 3.7 GiB microSD in a USB card
+reader, /dev/sdc. The original FAT partition was /dev/sdc1.
+userspace/prepare-sd.py is bound to the reader serial and capacity given
+on its command line and to the ROMFS hash from build-rootfs.py; it unmounts, replaces the first MiB
+with the whole-device ROMFS plus zero padding, fsyncs, reads back and journals.
+The partition has been unmounted, but the unattended UDisks2 OpenForRestore
+request required administrator authentication. No card bytes were written
+by that failed request. User was asked to run the prepared script with sudo
+in their own terminal and confirmed successful completion. The journal
+out/userspace/sd-write-20261022T190737Z.json records a matching readback of
+1048576 bytes, including the expected ROMFS hash. lsblk now shows no partitions
+or mountpoints on the card. A receiver is waiting for the board to power up
+with the SD installed; no SD Linux result yet.
+Repeating build-f020.sh produced identical ELF, RAM, flash, linker script and
+kernel configuration for attempt 07.
+
+Attempt 07b hardware result and immediate PoC priority
+-----------------------------------------------------
+The SD is now installed in the rosco board. A USB-UART reconnect interrupted
+the first waiting process; --ready loaded the receiver without another reset.
+The 393216-byte flash update took 44.5 s and the 697808-byte RAM upload 65.4 s,
+both with zero retries. Full flash readback matched and preserved the firmware.
+Flash after SHA256: 750a1a839fbf978f1455e99eafdb24ba7b7d141791f4c6c0c67be1bcf9870505.
+Linux then OOMed in iomap_dio_init -> bioset_init, before the UART/SD drivers.
+It had 268 KiB managed memory, 188 KiB slab, 56 KiB kernel stacks, and 16 KiB
+free (the reserve). No root mount or userspace was reached. Host UART test
+correctly failed. Evidence: logs/linux-20261022-07b.*.
+
+User explicitly prioritized the smallest real userspace PoC, with shell and
+additional functionality later. Aggressive minimal configuration is intended
+to remain useful for the eventual upstream port; do not expand the PoC scope.
+
+Next candidate uses flash 0xe0c000..0xe7ffff (464 KiB), preserving the lower
+48 KiB containing the entire 43858-byte Classic 2.42 image. The original
+double-read backup proves all bytes above offset 0xab51 were FF; the expanded
+window is therefore outside the firmware. WFX2 has this fixed range and a
+hard 0x74000-byte limit; WFX1 keeps its previous fixed upper-384-KiB range.
+Host checks the preserved bytes against the original backup and refuses any
+layout whose kernel window was not blank in that backup. It tests the first
+new empty 8 KiB sector, reads back the full array, programs the full window,
+and reads back everything again. PTY tests cover both layouts, CRC rejection,
+existing-kernel preservation, the whole expanded window, the last protected
+byte, an oversized payload, and a firmware backup extending into the window.
+The new 1064-byte loader has been disassembled and checked; WFX2 hardware
+validation is pending. No chip removal is required.
+
+Partition parsing is disabled because the SD contains whole-device ROMFS.
+BASE_SMALL permits LOG_BUF_SHIFT=10 (1 KiB text + 3200 bytes metadata instead
+of 4 KiB text + 12800 bytes metadata); long printk records may be truncated.
+Command-line logging is wrapped at 160 characters. This trimming is under
+build/hardware validation; userspace and its SD image are unchanged.
+
+Attempt 08 snapshot is out/attempt-08: RAM payload 599684 bytes, static RAM
+end 627496 (0x99328), flash text 472478 bytes in the expanded window. Static
+RAM use is 101376 bytes (99 KiB) below attempt 07. The remaining 421080 bytes
+above the kernel are not a runtime free-memory measurement. The full repeated
+build matched ELF, RAM, flash, kernel config and loader byte-for-byte.
+Firmware detected the installed SDHC card after Reset; its "Bad partition
+signature" is expected for whole-device ROMFS. WFX2's first-sector write and
+deliberate bad-CRC rejection passed, and full-array readback confirmed only
+that sector changed. Complete flash programming and Linux boot are in progress.
+
+Attempts 08--10: memory reductions and real SD detection
+-------------------------------------------------------
+Attempt 08 completed the bounded WFX2 flash update and full readback,
+preserving all 48 KiB of firmware. It then OOMed in iomap_ioend_init;
+its default two 32-entry BIO pools are excessive for this 1 MiB machine.
+Attempt 09 reduced these pools, passed UART registration and switched to
+ttySC0, but OOMed allocating the console TX buffer. The wrong SPI modalias
+prevented MMC from binding; mmc-spi-slot (not mmc_spi) is the matching ID.
+Attempt 10 reduced BASE_SMALL I/O pools to one entry, N_TTY buffers to
+1024 bytes, MMC queue depth to 4, and the NOMMU low-memory reserve to 4 KiB.
+The board detected the SDHC TSBBH card and registered mmcblk0, 3.69 GiB.
+It then OOMed creating a kernel worker: managed 364 KiB, slab 264 KiB,
+stacks 76 KiB, free 4 KiB. It has NOT mounted ROMFS or reached userspace.
+Evidence: logs/linux-20261022-08.*, -09.*, -10.*.
+
+Attempt 11: explicit ROMFS-only PoC option
+----------------------------------------
+ROSCO_M68K_ROMFS_POC removes raw block buffered writes and direct I/O and
+skips unused iomap/DIO reserve-pool initialization. Only ROMFS and buffer
+heads are used. This temporary option is not a general filesystem setup.
+Static RAM end is 614744 (0x96158), payload 587236, flash text 472044.
+The new kernel has no raw tick/stage diagnostics; LOCALVERSION_AUTO shows
+7.3.0-rosco-02415-g7be4bc52fd9e-dirty, identifying the base plus local changes.
+Build completed without compiler warnings; hardware verification pending.
+The user requests UART release immediately after success and a real, concise
+boot log (~50 lines) suitable for a terminal screenshot. No external posting
+is authorized. boot.py now exits immediately after a successful userspace
+round trip and paces input at 10 ms/byte.
+
+Attempt 11 SUCCESS on real hardware
+-----------------------------------
+Full flash programming took 53.8 s, RAM upload 55.0 s, both zero retries.
+The entire flash matched readback and the lower 48 KiB firmware was preserved.
+Linux detected mmcblk0, mounted ROMFS readonly at 179:0, freed 56 KiB initmem,
+and executed /init. Userspace printed getpid=0x00000001. The host sent
+rosco-userspace-uart-syscall-check and received that exact string after the
+userspace received: prefix. The .console.json journal is passed; boot.py
+exited successfully and released UART immediately.
+Evidence: logs/linux-20261022-11.log, .timed.log, .flash.json, .console.json;
+complete image/source snapshot out/attempt-11. This is a minimal FLAT program,
+not a shell. User faults/signals and broader filesystem behavior remain untested.
+console_view.py makes an explicitly shortened presentation of the real log;
+it preserves warnings, errors and panics. The original capture is unchanged.
+boot-terminal.sh provides a fresh real boot plus paced interactive UART input,
+with Ctrl-] disconnecting. Host terminal forwarding passed a PTY test.
+
+Screenshot handoff
+------------------
+UART is released after the successful attempt-11 syscall round trip.
+Attempt-12 disables KERN_DEBUG using loglevel=7. Binary comparison confirms
+identical flash and executable code; RAM differs in one command-line byte
+and the 20-byte ELF build ID only. It has not been rebooted by the agent.
+out/showcase points to attempt-12; the user will perform the screenshot boot
+with boot-terminal.sh. See SHOWCASE.txt. The preserved shortened capture has
+33 lines, including the actual version, root mount and userspace reply.
+All original logs are retained. No new UART process should be started without
+coordinating with the user, who is taking over the terminal.
+
+User requires GNU screen connected to the real serial port
+--------------------------------------------------------
+A saved-log replay or a Python console is insufficient for the requested
+Ubuntu terminal screenshot. boot-screen.sh now uploads via the existing
+validated protocol and hands the UART to ordinary GNU screen.
+A separate loader-screen.bin (1116 bytes) pauses after the final verified RAM
+block and waits for CR/LF. boot.py --screen reads the pause marker, explicitly
+releases TIOCEXCL, closes the UART, then launches screen on the real port.
+Only Enter from screen starts Linux, so no boot output is lost during handoff.
+The default loader.bin is still byte-identical to hardware-proven attempt-11.
+Both flash protocol tests and a PTY pause/close/reopen/Enter test passed.
+Loader-screen disassembly confirms the receiver stays below 0x1000 and
+only CR/LF reaches the kernel jump. Hardware validation is user-driven.
+The user additionally asked for a shorter raw log. Attempt-13 is building
+with loglevel=6; real UART, SD, mounted-root and init milestone messages are
+promoted to NOTICE. Warnings/errors remain visible. These five priority
+changes are demo presentation settings to revisit before upstream submission.
+Do not open the UART from the agent while the user uses screen.
+
+Attempt-13 validation in progress at the user's explicit request
+---------------------------------------------------------------
+The user asked the agent to boot the short-log build first for inspection.
+They pressed Reset; loader-screen.bin is running on the real board.
+The final kernel build has no compiler warnings; checkpatch for the five
+message-priority changes has zero warnings/errors. The flash image is
+byte-identical to attempt-11. RAM has the same size/layout and differs only
+in five log prefixes, one command-line digit, two default console levels,
+and the 20-byte ELF build ID (28 bytes total). No executable code differs.
+Snapshot: out/attempt-13. boot.py --receiver-ready --test-paused-loader
+--console-test is checking flash and uploading RAM. It will test that a
+non-Enter key leaves the loader paused, then start Linux with CR and require
+the exact userspace echo token before releasing UART.
+
+Attempt-13 PASSED: short raw boot log and paused loader
+------------------------------------------------------
+No flash programming was needed: the full array matched the expected image
+and preserved firmware. RAM upload 587236 bytes, 55.0 s, zero retries.
+The screen loader stayed silent after a non-Enter character for a second,
+then entered Linux only after CR. Real SD/ROMFS/PID1 and UART echo passed
+again. The process exited and released UART.
+There are 17 complete lines from Linux version through the verified reply.
+No host display filtering was used. The preserved full capture ends with
+a partial following userspace prompt because capture stopped as soon as the
+reply matched. The .boot.log excerpt stops at the last complete UART line.
+boot.py now waits for the following complete prompt before ending future
+console tests; the attempt-13 host snapshot preserves the exact tested code.
+out/showcase now selects attempt-13, verified on the board.
+The user will inspect this raw boot log before their own GNU screen run.
+No UART process remains owned by the agent.
+
+Screen UX update: preserve the real firmware banner
+-------------------------------------------------
+The user reported a blank screen after upload and requested the rosco banner
+followed by Linux in the same Ubuntu terminal. They released the serial port.
+boot-screen.sh now launches GNU screen FIRST, running boot.py --terminal
+--loader-progress inside it (sg dialout is still included). The ordinary
+hardware-proven loader starts Linux automatically; there is no mid-boot
+screen creation or Enter gate. Firmware UART INPUT remains live and unfiltered.
+The user requested a single progress bar instead of Read flash/Uploaded lines.
+LoaderProgress writes detailed records to .loader.log, redraws a single row
+with CR/erase-to-end-of-line, then clears that row before kernel output.
+Kermit's file transfer display is disabled, while INPUT echo and errors remain.
+Screen keeps a failed loader window visible (zombie kr).
+Checks: Python compile, shell syntax, flash protocol suite, fragmented progress
+write/percentage/one-row/final-clear checks passed. C-Kermit accepted
+set file display none. An additional GNU-screen UI test under sg could not
+start because the sandbox audit interface was unavailable; no board was
+accessed by that optional test. The new screen-before-Reset presentation
+has not yet had a hardware run; the kernel remains verified attempt-13.
+
+The user also requested a visible completion indication. After successful
+RAM transfer, the progress row now becomes one persistent line:
+"Upload complete: 587236 bytes, CRC OK." This is emitted only after the
+receiver acknowledges every block, never from the error cleanup path.
+Python compilation passed. No UART access or new hardware run was needed.
+
+Screen log screen-20261022T202930Z.log showed the stock unterminated
+"Ready for Kermit receive" prompt joined to "Kernel received okay".
+run.py now emits a local Kermit echo newline immediately after matching
+the firmware prompt when --quiet disables SEND's display. This preserves
+the original UART log and does not transmit anything extra to the board.
+Checked C-Kermit echo produces a newline with exit 0; Python compile passed.
+
+The Reset instruction is now sound only (terminal bell and the existing
+desktop chime), with no prompt text or extra line in the screenshot.
+
+2026-10-23: paused at the user's request
+--------------------------------------
+The user is disconnecting the board and will continue later. No board/UART
+operations are pending from the agent; do not start any until the user resumes.
+The later user-run screen session succeeded: linux-20261022T204440Z.log
+contains SDHC/ROMFS/PID1 and "userspace received: Hello, 68010!" followed
+by the next complete read prompt. This supersedes the earlier note that
+the screen-before-Reset workflow had no hardware run. The final newline
+and sound-only prompt changes were checked locally; no additional boot
+was requested for them.
+The kernel handoff at ../linux-rosco/ROSCO_LINUX_HANDOFF.txt now begins
+with the achieved PoC, exact selected image, current screen command,
+hardware state, pause instruction, and deferred upstream scope.

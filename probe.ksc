@@ -1,0 +1,21 @@
+set exit warning off
+set file display brief
+log debug /home/dmvo/Projects/rosco-linux/logs/kermit-probe.debug
+set line /dev/ttyUSB0
+if fail exit 1 Cannot open serial port
+set speed 115200
+set carrier-watch off
+set flow-control none
+set file type binary
+set transfer mode manual
+set send packet-length 90
+set window 1
+set session-log binary
+log session /home/dmvo/Projects/rosco-linux/logs/probe-20261022-01.log
+send /home/dmvo/Projects/rosco-linux/out/probe.bin
+if fail exit 2 Kermit transfer failed
+input 15 {Probe ready;}
+if fail exit 3 Probe did not report completion
+input 1 {Reset to return to firmware.}
+close session
+exit 0

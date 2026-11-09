@@ -1,0 +1,93 @@
+Kernel received okay; Starting...
+
+
+ROSCO-RAM-READY
+
+[host: CRC-checked 382212 bytes; 0 retries]
+
+RAM loader: entering Linux
+Linux version 7.3.0-rosco+ (rosco@linux) (m68k-linux-gnu-gcc (GCC) 15.2.0, GNU ld (GNU Binutils) 2.42) #1 2026-10-22 04:53:14 UTC
+printk: legacy bootconsole [earlyrosco0] enabled
+uClinux with CPU MC68010
+Flat model support (C) 1998,1999 Kenneth Albanowski, D. Jeff Dionne
+Zone ranges:
+  DMA      [mem 0x0000000000000000-0x00000000000fffff]
+  Normal   empty
+Movable zone start for each node
+Early memory node ranges
+  node   0: [mem 0x0000000000000000-0x00000000000fffff]
+Initmem setup node 0 [mem 0x0000000000000000-0x00000000000fffff]
+Kernel command line: console=earlyrosco keep_bootcon loglevel=8 panic=0 dhash_entries=128 ihash_entries=128 mhash_entries=64 mphash_entries=64
+printk: debug: skip boot console de-registration.
+printk: log buffer data + meta data: 4096 + 12800 = 16896 bytes
+Dentry cache hash table entries: 128 (order: 0, 512 bytes, linear)
+Inode-cache hash table entries: 128 (order: 0, 512 bytes, linear)
+Built 1 zonelists, mobility grouping off.  Total pages: 256
+mem auto-init: stack:off, heap alloc:off, heap free:off
+SLUB: HWalign=16, Order=0-1, MinObjects=0, CPUs=1, Nodes=1
+NR_IRQS: 32
+clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 76450417851000000 ns
+Calibrating delay loop... 0.78 BogoMIPS (lpj=15680)
+pid_max: default: 4096 minimum: 301
+Mount-cache hash table entries: 64 (order: 0, 256 bytes, linear)
+Mountpoint-cache hash table entries: 64 (order: 0, 256 bytes, linear)
+VFS: Finished mounting rootfs on nullfs
+bringup: vfs caches ready
+bringup: rest_init
+bringup: cloned init: 1
+bringup: cloned kthreadd: 2
+bringup: kernel_init_freeable
+Memory: 408K/1024K available (207K kernel code, 52K rwdata, 60K rodata, 52K init, 21K bss, 448K reserved, 0K cma-reserved)
+workingset: timestamp_bits=30 (anon: 25) max_order=8 bucket_order=0 (anon: 0)
+Warning: unable to open an initial console.
+VFS: Failed to pivot into new rootfs
+Freeing unused kernel image (initmem) memory: 52K
+This architecture does not have kernel memory protection.
+Run /sbin/init as init process
+  with arguments:
+    /sbin/init
+  with environment:
+    HOME=/
+    TERM=linux
+Run /etc/init as init process
+  with arguments:
+    /etc/init
+  with environment:
+    HOME=/
+    TERM=linux
+Run /bin/init as init process
+  with arguments:
+    /bin/init
+  with environment:
+    HOME=/
+    TERM=linux
+Run /bin/sh as init process
+  with arguments:
+    /bin/sh
+  with environment:
+    HOME=/
+    TERM=linux
+Kernel panic - not syncing: No working init found.  Try passing init= option to kernel. See Linux Documentation/admin-guide/init.rst for guidance.
+---[ end Kernel panic - not syncing: No working init found.  Try passing init= option to kernel. See Linux Documentation/admin-guide/init.rst for guidance. ]---
+
+[tick pc/jiffies/pid/free/isr] 00001764 ffffe331 00000001 00000066 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 ffffe3ae 00000001 00000066 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 ffffe42b 00000001 00000066 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 ffffe4a8 00000001 00000066 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001766 ffffe525 00000001 00000066 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001766 ffffe5a2 00000001 00000066 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001766 ffffe61f 00000001 00000066 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 ffffe69c 00000001 00000066 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001766 ffffe719 00000001 00000066 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 ffffe796 00000001 00000066 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 ffffe813 00000001 00000066 00000051 

@@ -1,0 +1,8 @@
+{
+  "state": "verified",
+  "start": 14811136,
+  "bytes": 393216,
+  "payload_sha256": "ae193e054c19520a54bbfe4989c763dceb13aad447e301df54e5dd8c8bd5430e",
+  "before_sha256": "bb9a613eeace8fdbbe522419628aed8798cd1d7ff1db48e8866cd691ba8b057d",
+  "after_sha256": "750a1a839fbf978f1455e99eafdb24ba7b7d141791f4c6c0c67be1bcf9870505"
+}

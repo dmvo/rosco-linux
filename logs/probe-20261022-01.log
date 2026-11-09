@@ -1,0 +1,7 @@
+Kernel received okay; Starting...
+
+
+ROSCO LINUX inventory probe (RAM only)
+SDB magic=0x00001DF8 RAM bytes=0x00100000 CPU info=0x2001393E
+UART=0x00F00001 ROM version word=0x60000242 VBR=0x00000000
+Probe ready; polling UART echo. Reset to return to firmware.

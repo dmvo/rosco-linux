@@ -1,0 +1,19 @@
+
+[1;33m                                 ___ ___ _   
+ ___ ___ ___ ___ ___       _____|  _| . | |_ 
+|  _| . |_ -|  _| . |     |     | . | . | '_|
+|_| |___|___|___|___|_____|_|_|_|___|___|_,_|
+                    |_____|[1;37m      Classic [1;30m2.42[0m
+
+MC68010 CPU @ 8.0MHz with 1048576 bytes RAM
+Initializing hard drives... No IDE interface found
+Searching for boot media...
+SDHC card:
+  Bad partition signature
+No bootable media found
+Ready for Kermit receiveKernel received okay; Starting...
+
+
+ROSCO-RAM-READY
+
+ROSCO-LINUX-PAUSED

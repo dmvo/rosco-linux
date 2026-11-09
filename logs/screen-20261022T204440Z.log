@@ -1,0 +1,48 @@
+
+[1;33m                                 ___ ___ _   
+ ___ ___ ___ ___ ___       _____|  _| . | |_ 
+|  _| . |_ -|  _| . |     |     | . | . | '_|
+|_| |___|___|___|___|_____|_|_|_|___|___|_,_|
+                    |_____|[1;37m      Classic [1;30m2.42[0m
+
+MC68010 CPU @ 8.0MHz with 1048576 bytes RAM
+Initializing hard drives... No IDE interface found
+Searching for boot media...
+SDHC card:
+  Bad partition signature
+No bootable media found
+Ready for Kermit receive
+Kernel received okay; Starting...
+
+
+ROSCO-RAM-READY
+Checking flash [........................]   0%[KChecking flash [===.....................]  12%[KChecking flash [======..................]  25%[KChecking flash [=========...............]  37%[KChecking flash [============............]  50%[KChecking flash [===============.........]  62%[KChecking flash [==================......]  75%[KChecking flash [=====================...]  87%[KUploading      [........................]   0%[KUploading      [==......................]  11%[KUploading      [=====...................]  22%[KUploading      [========................]  33%[KUploading      [==========..............]  44%[KUploading      [=============...........]  55%[KUploading      [================........]  67%[KUploading      [==================......]  78%[KUploading      [=====================...]  89%[K[KUpload complete: 587236 bytes, CRC OK.
+
+RAM loader: entering Linux
+Linux version 7.3.0-rosco-02415-g7be4bc52fd9e-dirty (rosco@linux) (m68k-linux-gnu-gcc (GCC) 15.2.0, GNU ld (GNU Binutils) 2.42) #1 2026-10-22 04:53:14 UTC
+rosco_m68k R2: MC68010, 1 MiB RAM, split RAM/flash kernel
+Kernel command line: console=ttySC0,115200 loglevel=6 panic=0 dhash_entries=128 ihash_entries=128 mhash_entries=64 mphash_entries=64 root=/dev/mmcblk0 \
+Kernel command line: rootfstype=romfs ro rootwait init=/init
+uart-sccnxp xr68c681: Using default clock frequency
+xr68c681: ttySC0 MMIO:0x00f00001 (irq = 5, base_baud = 230400) is a XR68C681
+xr68c681: ttySC1 MMIO:0x00f00001 (irq = 5, base_baud = 230400) is a XR68C681
+mmc0: host does not support reading read-only switch, assuming write-enable
+mmc0: new SDHC card on SPI
+mmcblk0: mmc0:0000 TSBBH 3.69 GiB
+VFS: Mounted root (romfs filesystem) readonly on device 179:0.
+This architecture does not have kernel memory protection.
+Run /init as init process
+ROSCO Linux userspace from SD; getpid=0x00000001
+userspace read: enter a line
+Hello, 68010!
+userspace received: Hello, 68010!
+userspace read: enter a line
+random: crng init done
+Traceback (most recent call last):
+  File "/home/dmvo/Projects/rosco-linux/boot.py", line 447, in <module>
+    main()
+  File "/home/dmvo/Projects/rosco-linux/boot.py", line 401, in main
+    raise OSError("UART disconnected")
+OSError: UART disconnected
+
+=== Command terminated with exit status 1 (Fri Oct 23 00:38:30 2026) ===

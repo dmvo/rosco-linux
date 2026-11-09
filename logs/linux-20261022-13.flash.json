@@ -1,0 +1,8 @@
+{
+  "state": "already verified",
+  "start": 14729216,
+  "bytes": 475136,
+  "protocol": "WFX2",
+  "payload_sha256": "8ed7b48080e070da10354d064ee330dce7677d46c0d028c29c06705323e8b9af",
+  "before_sha256": "c5ba9b137d5c7151ef06846034903b6436f5c8d0083972abea4b4340f3ef8f62"
+}

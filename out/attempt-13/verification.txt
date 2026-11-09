@@ -1,0 +1,8 @@
+Hardware PASSED: SDHC, mmcblk0, ROMFS root, FLAT /init, getpid=1 and exact UART echo.
+The screen loader remained paused after a non-Enter character for one second.
+CR then started the real Linux kernel. Flash matched attempt-11; no rewrite.
+RAM upload: 587236 bytes, 55.0 s, zero retries.
+Raw UART Linux boot and reply: 17 complete lines, no console-view filtering.
+Evidence: ../../logs/linux-20261022-13.{log,timed.log,console.json,flash.json}
+The host capture ended during the following prompt; the boot excerpt ends
+at the last complete UART line. Full original capture is preserved.

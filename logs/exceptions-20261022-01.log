@@ -1,0 +1,20 @@
+
+[1;33m                                 ___ ___ _   
+ ___ ___ ___ ___ ___       _____|  _| . | |_ 
+|  _| . |_ -|  _| . |     |     | . | . | '_|
+|_| |___|___|___|___|_____|_|_|_|___|___|_,_|
+                    |_____|[1;37m      Classic [1;30m2.42[0m
+
+MC68010 CPU @ 8.0MHz with 1048576 bytes RAM
+Initializing hard drives... No IDE interface found
+Searching for boot media...
+No bootable media found
+Ready for Kermit receiveKernel received okay; Starting...
+
+
+ROSCO LINUX inventory probe (RAM only)
+SDB magic=0x00001DF8 RAM bytes=0x00100000 CPU info=0x20013924
+UART=0x00F00001 ROM version word=0x60000242 VBR=0x00000000
+Address error format/vector=0x0000800C fault=0x00000001 ssw=0x00001105 saved_pc=0x000400B2
+Bus error format/vector=0x00008008 fault=0x00800000 ssw=0x00001105 saved_pc=0x000400D4
+Probe ready; polling UART echo. Reset to return to firmware.

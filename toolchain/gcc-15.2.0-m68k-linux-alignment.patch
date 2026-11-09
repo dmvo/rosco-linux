@@ -1,0 +1,11 @@
+--- a/gcc/config/m68k/linux.h
++++ b/gcc/config/m68k/linux.h
+@@ -28,7 +28,7 @@
+ /* for 68k machines this only needs to be TRUE for the 68000 */
+ 
+ #undef STRICT_ALIGNMENT
+-#define STRICT_ALIGNMENT 0
++#define STRICT_ALIGNMENT (TARGET_STRICT_ALIGNMENT && !TARGET_68020)
+ #undef M68K_HONOR_TARGET_STRICT_ALIGNMENT
+ #define M68K_HONOR_TARGET_STRICT_ALIGNMENT 0
+ 

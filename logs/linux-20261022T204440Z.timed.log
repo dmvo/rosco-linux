@@ -1,0 +1,21 @@
+    0.000 
+    0.000 RAM loader: entering Linux
+    0.079 Linux version 7.3.0-rosco-02415-g7be4bc52fd9e-dirty (rosco@linux) (m68k-linux-gnu-gcc (GCC) 15.2.0, GNU ld (GNU Binutils) 2.42) #1 2026-10-22 04:53:14 UTC
+    0.079 rosco_m68k R2: MC68010, 1 MiB RAM, split RAM/flash kernel
+    0.360 Kernel command line: console=ttySC0,115200 loglevel=6 panic=0 dhash_entries=128 ihash_entries=128 mhash_entries=64 mphash_entries=64 root=/dev/mmcblk0 \
+    0.360 Kernel command line: rootfstype=romfs ro rootwait init=/init
+    5.271 uart-sccnxp xr68c681: Using default clock frequency
+    5.420 xr68c681: ttySC0 MMIO:0x00f00001 (irq = 5, base_baud = 230400) is a XR68C681
+    5.660 xr68c681: ttySC1 MMIO:0x00f00001 (irq = 5, base_baud = 230400) is a XR68C681
+    8.604 mmc0: host does not support reading read-only switch, assuming write-enable
+    8.635 mmc0: new SDHC card on SPI
+    9.004 mmcblk0: mmc0:0000 TSBBH 3.69 GiB
+   12.795 VFS: Mounted root (romfs filesystem) readonly on device 179:0.
+   12.891 This architecture does not have kernel memory protection.
+   12.923 Run /init as init process
+   13.147 ROSCO Linux userspace from SD; getpid=0x00000001
+   13.179 userspace read: enter a line
+   65.090 Hello, 68010!
+   65.138 userspace received: Hello, 68010!
+   65.170 userspace read: enter a line
+  300.956 random: crng init done

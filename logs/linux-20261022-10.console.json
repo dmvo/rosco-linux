@@ -1,0 +1,6 @@
+{
+  "state": "failed",
+  "byte_interval_ms": 2,
+  "token": "rosco-userspace-uart-syscall-check",
+  "reason": "OOM creating a kernel worker after SDHC/mmcblk0 detection; /init not reached"
+}

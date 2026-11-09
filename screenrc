@@ -1,0 +1,7 @@
+# Raw physical UART console; no host-side log filtering.
+startup_message off
+defscrollback 5000
+defflow off
+logfile flush 1
+# Keep errors visible if the loader exits before Linux starts.
+zombie kr

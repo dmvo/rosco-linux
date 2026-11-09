@@ -1,0 +1,31 @@
+
+/home/dmvo/Projects/rosco-linux/out/split-f020/vmlinux:     file format elf32-m68k
+
+Sections:
+Idx Name          Size      VMA       LMA       File off  Algn
+  0 .xiptext      000733ec  00e0c000  00e0c000  00092000  2**1
+                  CONTENTS, ALLOC, LOAD, READONLY, CODE
+  1 .text         0005e210  00001000  00001000  00001000  2**2
+                  CONTENTS, ALLOC, LOAD, READONLY, CODE
+  2 .rodata       00014ee8  00060000  00060000  00060000  2**12
+                  CONTENTS, ALLOC, LOAD, DATA
+  3 __param       00000258  00074ee8  00074ee8  00074ee8  2**1
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+  4 .notes        00000054  00075140  00075140  00075140  2**2
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+  5 .data         0000c0e0  00076000  00076000  00076000  2**6
+                  CONTENTS, ALLOC, LOAD, DATA
+  6 .init.text    0000b530  00083000  00083000  00083000  2**1
+                  CONTENTS, ALLOC, LOAD, READONLY, CODE
+  7 .init.data    000020b4  0008e530  0008e530  0008e530  2**1
+                  CONTENTS, ALLOC, LOAD, DATA
+  8 .data..percpu 00000000  00091000  00091000  001053ec  2**0
+                  CONTENTS, ALLOC, LOAD, DATA
+  9 .init.data    00000000  00091000  00091000  001053ec  2**0
+                  CONTENTS
+ 10 .bss          00005155  00091000  00091000  000905e4  2**4
+                  ALLOC
+ 11 .modinfo      00000da1  00096158  00096158  001053ec  2**0
+                  CONTENTS, READONLY
+ 12 .comment      00000012  00000000  00000000  0010618d  2**0
+                  CONTENTS, READONLY

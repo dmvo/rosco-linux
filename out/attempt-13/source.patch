@@ -1,0 +1,1115 @@
+diff --git a/arch/m68k/68000/Makefile b/arch/m68k/68000/Makefile
+index 279560add577..7dba722c27a9 100644
+--- a/arch/m68k/68000/Makefile
++++ b/arch/m68k/68000/Makefile
+@@ -10,7 +10,12 @@
+ 
+ # 68328, 68EZ328, 68VZ328
+ 
+-obj-y			+= entry.o ints.o timers.o m68328.o
++obj-y			+= entry.o
++ifdef CONFIG_ROSCO_M68K
++obj-y			+= rosco.o
++else
++obj-y			+= ints.o timers.o m68328.o
++endif
+ obj-$(CONFIG_ROM)	+= romvec.o
+ 
+ obj-$(CONFIG_DRAGEN2)	+= dragen2.o
+diff --git a/arch/m68k/68000/entry.S b/arch/m68k/68000/entry.S
+index c257cc415c47..adf8b52e9682 100644
+--- a/arch/m68k/68000/entry.S
++++ b/arch/m68k/68000/entry.S
+@@ -127,6 +127,15 @@ Lsignal_return:
+ /*
+  * This is the main interrupt handler, responsible for calling process_int()
+  */
++#ifdef CONFIG_ROSCO_M68K
++ENTRY(rosco_inthandler)
++	SAVE_ALL_INT
++	movel	%sp,%sp@-
++	pea	5:w
++	jbsr	do_IRQ
++	addql	#8,%sp
++	bra	ret_from_exception
++#else
+ inthandler1:
+ 	SAVE_ALL_INT
+ 	movew	%sp@(PT_OFF_FORMATVEC), %d0
+@@ -218,6 +227,7 @@ inthandler:
+ /*
+  * Handler for uninitialized and spurious interrupts.
+  */
++#endif
+ ENTRY(bad_interrupt)
+ 	addql	#1,irq_err_count
+ 	rte
+diff --git a/arch/m68k/68000/head.S b/arch/m68k/68000/head.S
+index 140220662e33..9398b2470d86 100644
+--- a/arch/m68k/68000/head.S
++++ b/arch/m68k/68000/head.S
+@@ -77,6 +77,11 @@ _start:
+ 
+ 	movew	#0x2700, %sr			/* disable all interrupts */
+ 
++#ifdef CONFIG_M68010
++	movel	#CONFIG_VECTORBASE, %d0
++	movec	%d0, %vbr
++#endif
++
+ /*****************************************************************************
+  * Setup PLL and wait for it to settle (in 68x328 cpu's).
+  * Also, if enabled, init serial port.
+diff --git a/arch/m68k/68000/rosco.c b/arch/m68k/68000/rosco.c
+new file mode 100644
+index 000000000000..277a281b88a3
+--- /dev/null
++++ b/arch/m68k/68000/rosco.c
+@@ -0,0 +1,295 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/* Initial rosco_m68k R2 console and timer bring-up. */
++
++#include <linux/clocksource.h>
++#include <linux/console.h>
++#include <linux/cpu.h>
++#include <linux/delay.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/mm.h>
++#include <linux/mmc/host.h>
++#include <linux/platform_device.h>
++#include <linux/platform_data/serial-sccnxp.h>
++#include <linux/printk.h>
++#include <linux/sched.h>
++#include <linux/spi/mmc_spi.h>
++#include <linux/spi/spi_bitbang.h>
++#include <asm/machdep.h>
++#include <asm/traps.h>
++
++#define ROSCO_DUART	0xf00001
++#define ROSCO_TIMER_IRQ	5
++#define ROSCO_TIMER_BIT	0x08
++#define ROSCO_TIMER_RELOAD (3686400 / (16 * 2 * HZ))
++#define ROSCO_SD_CS	BIT(2)
++#define ROSCO_SD_CLK	BIT(4)
++#define ROSCO_SD_MOSI	BIT(6)
++#define ROSCO_SD_MISO	BIT(2)
++
++static u8 rosco_uart_imr;
++static bool rosco_irq_enabled;
++
++asmlinkage void system_call(void);
++asmlinkage void buserr(void);
++asmlinkage void trap(void);
++asmlinkage void bad_interrupt(void);
++asmlinkage void rosco_inthandler(void);
++
++static u8 duart_read(unsigned int reg)
++{
++	return readb((void __iomem *)(ROSCO_DUART + 2 * reg));
++}
++
++static void duart_write(unsigned int reg, u8 value)
++{
++	writeb(value, (void __iomem *)(ROSCO_DUART + 2 * reg));
++}
++
++static void rosco_putchar(char c)
++{
++	while (!(duart_read(1) & 0x04))
++		cpu_relax();
++	duart_write(3, c);
++}
++
++static void rosco_console_write(struct console *con, const char *s,
++				unsigned int count)
++{
++	while (count--) {
++		if (*s == '\n')
++			rosco_putchar('\r');
++		rosco_putchar(*s++);
++	}
++}
++
++static struct console rosco_console = {
++	.name = "earlyrosco",
++	.write = rosco_console_write,
++	.flags = CON_PRINTBUFFER | CON_BOOT,
++	.index = -1,
++};
++
++static void rosco_irq_mask(struct irq_data *d)
++{
++	rosco_irq_enabled = false;
++	duart_write(5, 0);
++}
++
++static void rosco_irq_unmask(struct irq_data *d)
++{
++	rosco_irq_enabled = true;
++	duart_write(5, ROSCO_TIMER_BIT | rosco_uart_imr);
++}
++
++static void rosco_uart_write_imr(struct device *dev, u8 mask)
++{
++	unsigned long flags;
++
++	local_irq_save(flags);
++	rosco_uart_imr = mask & 0x33;
++	if (rosco_irq_enabled)
++		duart_write(5, ROSCO_TIMER_BIT | rosco_uart_imr);
++	local_irq_restore(flags);
++}
++
++static struct sccnxp_pdata rosco_uart_data = {
++	.reg_shift = 1,
++	.acr_fixed = 0x70,
++	.write_imr = rosco_uart_write_imr,
++	.shared_irq = true,
++};
++
++static struct resource rosco_uart_resources[] = {
++	DEFINE_RES_MEM(ROSCO_DUART, 0x20),
++	DEFINE_RES_IRQ(ROSCO_TIMER_IRQ),
++};
++
++static struct platform_device rosco_uart_device = {
++	.name = "xr68c681",
++	.id = -1,
++	.resource = rosco_uart_resources,
++	.num_resources = ARRAY_SIZE(rosco_uart_resources),
++	.dev.platform_data = &rosco_uart_data,
++};
++
++#if IS_BUILTIN(CONFIG_SPI_BITBANG)
++/* Writes to SOP/ROP control pins; reads of those registers control the timer. */
++static void rosco_spi_cs(struct spi_device *spi, int active)
++{
++	bool high = !active;
++
++	if (spi->mode & SPI_CS_HIGH)
++		high = !high;
++	duart_write(14, ROSCO_SD_CLK);
++	duart_write(high ? 15 : 14, ROSCO_SD_CS);
++}
++
++static u32 rosco_spi_word(struct spi_device *spi, unsigned int ns, u32 word,
++			  u8 bits, unsigned int flags)
++{
++	u32 result = 0;
++
++	/* Mode 0, MSB first. IRQs remain enabled throughout the transfer. */
++	while (bits--) {
++		duart_write(word & BIT(bits) ? 15 : 14, ROSCO_SD_MOSI);
++		ndelay(ns);
++		duart_write(15, ROSCO_SD_CLK);
++		ndelay(ns);
++		result = (result << 1) | !!(duart_read(13) & ROSCO_SD_MISO);
++		duart_write(14, ROSCO_SD_CLK);
++	}
++	return result;
++}
++
++static int rosco_sd_init(struct device *dev,
++			irqreturn_t (*handler)(int, void *), void *data)
++{
++	struct mmc_host *host = data;
++
++	/* Bound scatterlists and request latency on the 1 MiB bitbanged host. */
++	host->max_blk_count = PAGE_SIZE / 512;
++	host->max_req_size = PAGE_SIZE;
++	host->max_segs = PAGE_SIZE / 512;
++	return 0;
++}
++
++static struct mmc_spi_platform_data rosco_sd_data = {
++	.init = rosco_sd_init,
++	.ocr_mask = MMC_VDD_32_33 | MMC_VDD_33_34,
++	/* No card-detect wire: insert the card before starting Linux. */
++	.caps = MMC_CAP_NONREMOVABLE,
++};
++
++static struct spi_board_info rosco_sd_info __initdata = {
++	.modalias = "mmc-spi-slot",
++	.max_speed_hz = 400000,
++	.bus_num = 0,
++	.chip_select = 0,
++	.mode = SPI_MODE_0,
++	.platform_data = &rosco_sd_data,
++};
++
++static int __init rosco_spi_init(void)
++{
++	struct spi_controller *ctlr;
++	struct spi_bitbang *bang;
++	int ret;
++
++	/* All GPIO outputs are software-controlled. Deselect both board CS pins. */
++	duart_write(13, 0);
++	duart_write(15, ROSCO_SD_CS | ROSCO_SD_MOSI | BIT(7));
++	duart_write(14, ROSCO_SD_CLK);
++	ctlr = spi_alloc_host(&rosco_uart_device.dev, sizeof(*bang));
++	if (!ctlr)
++		return -ENOMEM;
++	ctlr->bus_num = 0;
++	ctlr->num_chipselect = 1;
++	ctlr->mode_bits = SPI_CS_HIGH;
++	ctlr->bits_per_word_mask = SPI_BPW_MASK(8);
++	ctlr->max_speed_hz = 400000;
++	bang = spi_controller_get_devdata(ctlr);
++	bang->ctlr = ctlr;
++	bang->chipselect = rosco_spi_cs;
++	bang->txrx_word[SPI_MODE_0] = rosco_spi_word;
++	ret = spi_bitbang_start(bang);
++	if (ret) {
++		spi_controller_put(ctlr);
++		return ret;
++	}
++	if (!spi_new_device(ctlr, &rosco_sd_info)) {
++		spi_bitbang_stop(bang);
++		return -ENODEV;
++	}
++	return 0;
++}
++#else
++static int __init rosco_spi_init(void)
++{
++	return 0;
++}
++#endif
++
++static int __init rosco_devices_init(void)
++{
++	int ret = platform_device_register(&rosco_uart_device);
++
++	if (ret)
++		return ret;
++	return rosco_spi_init();
++}
++arch_initcall(rosco_devices_init);
++
++static struct irq_chip rosco_irq_chip = {
++	.name = "XR68C681",
++	.irq_mask = rosco_irq_mask,
++	.irq_unmask = rosco_irq_unmask,
++};
++
++void __init init_IRQ(void)
++{
++	duart_write(5, 0);
++	irq_set_chip_and_handler(ROSCO_TIMER_IRQ, &rosco_irq_chip,
++				handle_level_irq);
++}
++
++void __init trap_init(void)
++{
++	unsigned int i;
++
++	for (i = 2; i < 256; i++)
++		_ramvec[i] = trap;
++	for (i = 24; i < 32; i++)
++		_ramvec[i] = bad_interrupt;
++	_ramvec[VEC_BUSERR] = buserr;
++	_ramvec[VEC_SYS] = system_call;
++	_ramvec[0x45] = rosco_inthandler;
++}
++
++static irqreturn_t rosco_tick(int irq, void *dev)
++{
++	if (!(duart_read(5) & ROSCO_TIMER_BIT))
++		return IRQ_NONE;
++	/* In timer mode, STOP clears the interrupt without stopping counting. */
++	duart_read(15);
++	legacy_timer_tick(1);
++	return IRQ_HANDLED;
++}
++
++static void __init rosco_timer_init(void)
++{
++	int ret;
++
++	duart_write(5, 0);
++	duart_write(12, 0x45);
++	duart_write(4, 0xf0);
++	/* 3.6864 MHz crystal, divide by 16, two periods per interrupt. */
++	duart_write(6, ROSCO_TIMER_RELOAD >> 8);
++	duart_write(7, ROSCO_TIMER_RELOAD & 0xff);
++	duart_read(15);
++	ret = request_irq(ROSCO_TIMER_IRQ, rosco_tick, IRQF_TIMER | IRQF_SHARED,
++			  "rosco-timer", &rosco_irq_chip);
++	if (ret)
++		panic("Cannot request rosco timer IRQ: %d", ret);
++	duart_read(14);
++}
++
++static void rosco_reset(void)
++{
++	local_irq_disable();
++	asm volatile ("moveq #0,%%d0\n\t"
++		      "movec %%d0,%%vbr\n\t"
++		      "move.l 0xe00000,%%sp\n\t"
++		      "move.l 0xe00004,%%a0\n\t"
++		      "jmp (%%a0)" : : : "d0", "a0", "memory");
++}
++
++void __init config_BSP(char *command, int len)
++{
++	register_console(&rosco_console);
++	pr_notice("rosco_m68k R2: MC68010, 1 MiB RAM, split RAM/flash kernel\n");
++	mach_sched_init = rosco_timer_init;
++	mach_reset = rosco_reset;
++}
+diff --git a/arch/m68k/Kconfig b/arch/m68k/Kconfig
+index 11835eb59d94..96dfb2b3fb51 100644
+--- a/arch/m68k/Kconfig
++++ b/arch/m68k/Kconfig
+@@ -74,6 +74,7 @@ config NO_IOPORT_MAP
+ config HZ
+ 	int
+ 	default 1000 if CLEOPATRA
++	default 25 if ROSCO_M68K
+ 	default 100
+ 
+ config PGTABLE_LEVELS
+diff --git a/arch/m68k/Kconfig.cpu b/arch/m68k/Kconfig.cpu
+index 5a58cc13229e..ec8d03d01744 100644
+--- a/arch/m68k/Kconfig.cpu
++++ b/arch/m68k/Kconfig.cpu
+@@ -67,6 +67,13 @@ config M68000
+ 	  System-On-Chip devices (eg 68328, 68302, etc). It does not contain
+ 	  a paging MMU.
+ 
++config M68010
++	bool "MC68010 processor"
++	depends on M68000
++	help
++	  Select this for a stand-alone MC68010 without an MMU. The 68010
++	  uses a vector base register and format/vector exception frames.
++
+ config M68020
+ 	bool "68020 support" if M68KCLASSIC
+ 	depends on MMU
+@@ -412,6 +419,7 @@ config SINGLE_MEMORY_CHUNK
+ config ARCH_FORCE_MAX_ORDER
+ 	int "Order of maximal physically contiguous allocations" if ADVANCED
+ 	depends on !SINGLE_MEMORY_CHUNK
++	default 8 if ROSCO_M68K
+ 	default "10"
+ 	help
+ 	  The kernel page allocator limits the size of maximal physically
+diff --git a/arch/m68k/Kconfig.machine b/arch/m68k/Kconfig.machine
+index cff990c319cb..f86eca3d985e 100644
+--- a/arch/m68k/Kconfig.machine
++++ b/arch/m68k/Kconfig.machine
+@@ -144,6 +144,26 @@ config VIRT
+ 	  This options enable a pure virtual machine based on m68k,
+ 	  VIRTIO MMIO devices and GOLDFISH interfaces (TTY, RTC, PIC).
+ 
++config ROSCO_M68K
++	bool "rosco_m68k R2"
++	depends on !MMU
++	select M68010
++	help
++	  Support the rosco_m68k R2 board fitted with an MC68010 and an
++	  XR68C681 DUART. The board has 1 MiB of RAM.
++	  Serial console, timer interrupts and SPI SD storage are supported.
++	  Select this only for a board fitted with the MC68010 processor.
++
++config ROSCO_M68K_ROMFS_POC
++	bool "Minimal read-only ROMFS proof of concept"
++	depends on ROSCO_M68K && BLOCK
++	select BUFFER_HEAD
++	help
++	  Temporary bring-up configuration for a ROMFS-only system. Disable
++	  raw block-device writes, direct I/O and unused iomap reserve pools.
++	  Do not enable filesystems that use iomap with this option.
++	  This option is intended only for the minimal userspace boot demo.
++
+ config PILOT
+ 	bool
+ 
+diff --git a/arch/m68k/Makefile b/arch/m68k/Makefile
+index 0abcf994ce55..f78fcf8e0f67 100644
+--- a/arch/m68k/Makefile
++++ b/arch/m68k/Makefile
+@@ -38,6 +38,7 @@ endif
+ cpuflags-$(CONFIG_M68030)	=
+ cpuflags-$(CONFIG_M68020)	=
+ cpuflags-$(CONFIG_M68000)	= -m68000
++cpuflags-$(CONFIG_M68010)	= -m68010
+ cpuflags-$(CONFIG_M5441x)	= $(call cc-option,-mcpu=54455,-mcfv4e)
+ cpuflags-$(CONFIG_M54xx)	= $(call cc-option,-mcpu=5475,-m5200)
+ cpuflags-$(CONFIG_M5407)	= $(call cc-option,-mcpu=5407,-m5200)
+diff --git a/arch/m68k/configs/rosco_m68k_defconfig b/arch/m68k/configs/rosco_m68k_defconfig
+new file mode 100644
+index 000000000000..0691743f1b01
+--- /dev/null
++++ b/arch/m68k/configs/rosco_m68k_defconfig
+@@ -0,0 +1,79 @@
++CONFIG_LOCALVERSION="-rosco"
++CONFIG_LOCALVERSION_AUTO=y
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++CONFIG_EXPERT=y
++# CONFIG_MULTIUSER is not set
++# CONFIG_FHANDLE is not set
++# CONFIG_POSIX_TIMERS is not set
++CONFIG_PRINTK=y
++CONFIG_CONSOLE_LOGLEVEL_DEFAULT=6
++CONFIG_LOG_BUF_SHIFT=10
++CONFIG_CMDLINE_LOG_WRAP_IDEAL_LEN=160
++# CONFIG_BUG is not set
++# CONFIG_ELF_CORE is not set
++# CONFIG_COREDUMP is not set
++# CONFIG_BASE_FULL is not set
++CONFIG_BASE_SMALL=y
++# CONFIG_FUTEX is not set
++# CONFIG_EPOLL is not set
++# CONFIG_SIGNALFD is not set
++# CONFIG_TIMERFD is not set
++# CONFIG_EVENTFD is not set
++# CONFIG_AIO is not set
++# CONFIG_IO_URING is not set
++# CONFIG_ADVISE_SYSCALLS is not set
++CONFIG_EMBEDDED=y
++# CONFIG_MMU is not set
++CONFIG_M68KCLASSIC=y
++CONFIG_ROSCO_M68K=y
++CONFIG_ROSCO_M68K_ROMFS_POC=y
++CONFIG_RAMBASE=0x0
++CONFIG_RAMSIZE=0x100000
++CONFIG_VECTORBASE=0x0
++CONFIG_KERNELBASE=0x1000
++CONFIG_4KSTACKS=y
++CONFIG_RAMKERNEL=y
++CONFIG_BLOCK=y
++CONFIG_PARTITION_ADVANCED=y
++# CONFIG_MSDOS_PARTITION is not set
++# CONFIG_EFI_PARTITION is not set
++# CONFIG_BINFMT_ELF_FDPIC is not set
++# CONFIG_BINFMT_SCRIPT is not set
++CONFIG_BINFMT_FLAT=y
++# CONFIG_INPUT is not set
++CONFIG_TTY=y
++# CONFIG_VT is not set
++# CONFIG_LEGACY_PTYS is not set
++# CONFIG_UNIX98_PTYS is not set
++CONFIG_SERIAL_SCCNXP=y
++CONFIG_SERIAL_SCCNXP_CONSOLE=y
++CONFIG_SPI=y
++CONFIG_SPI_BITBANG=y
++CONFIG_MMC=y
++CONFIG_MMC_BLOCK=y
++CONFIG_MMC_BLOCK_MINORS=4
++CONFIG_MMC_SPI=y
++CONFIG_MISC_FILESYSTEMS=y
++CONFIG_ROMFS_FS=y
++CONFIG_ROMFS_BACKED_BY_BLOCK=y
++# CONFIG_DEVMEM is not set
++# CONFIG_HWMON is not set
++# CONFIG_HID_SUPPORT is not set
++# CONFIG_USB_SUPPORT is not set
++# CONFIG_FW_LOADER is not set
++# CONFIG_FILE_LOCKING is not set
++# CONFIG_DNOTIFY is not set
++# CONFIG_INOTIFY_USER is not set
++# CONFIG_FANOTIFY is not set
++# CONFIG_SYSFS is not set
++# CONFIG_PROC_FS is not set
++# CONFIG_VM_EVENT_COUNTERS is not set
++# CONFIG_KALLSYMS is not set
++CONFIG_INIT_STACK_NONE=y
++CONFIG_SLUB_TINY=y
++# CONFIG_SLUB_DEBUG is not set
++CONFIG_LD_DEAD_CODE_DATA_ELIMINATION=y
++CONFIG_BOOTPARAM=y
++CONFIG_BOOTPARAM_STRING="console=ttySC0,115200 loglevel=6 panic=0 dhash_entries=128 ihash_entries=128 mhash_entries=64 mphash_entries=64 root=/dev/mmcblk0 rootfstype=romfs ro rootwait init=/init"
++# CONFIG_RANDOM_TRUST_CPU is not set
++# CONFIG_RANDOM_TRUST_BOOTLOADER is not set
+diff --git a/arch/m68k/include/asm/sections.h b/arch/m68k/include/asm/sections.h
+new file mode 100644
+index 000000000000..83712e7eb7e0
+--- /dev/null
++++ b/arch/m68k/include/asm/sections.h
+@@ -0,0 +1,36 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef _M68K_SECTIONS_H
++#define _M68K_SECTIONS_H
++
++#include <linux/types.h>
++
++#ifdef CONFIG_ROSCO_M68K
++static inline bool __is_kernel_text(unsigned long addr);
++static inline bool __is_kernel(unsigned long addr);
++#define __is_kernel_text __is_kernel_text
++#define __is_kernel __is_kernel
++#endif
++
++#include <asm-generic/sections.h>
++
++#ifdef CONFIG_ROSCO_M68K
++/* Weak bounds are zero in the ordinary RAM link, set by the split linker. */
++extern char __xiptext_start[] __weak, __xiptext_end[] __weak;
++
++static inline bool __is_kernel_text(unsigned long addr)
++{
++	return (addr >= (unsigned long)_stext && addr < (unsigned long)_etext) ||
++	       (addr >= (unsigned long)__xiptext_start &&
++		addr < (unsigned long)__xiptext_end);
++}
++
++static inline bool __is_kernel(unsigned long addr)
++{
++	return __is_kernel_text(addr) ||
++	       (addr >= (unsigned long)_stext && addr < (unsigned long)_end) ||
++	       (addr >= (unsigned long)__init_begin &&
++		addr < (unsigned long)__init_end);
++}
++#endif
++
++#endif /* _M68K_SECTIONS_H */
+diff --git a/arch/m68k/include/asm/traps.h b/arch/m68k/include/asm/traps.h
+index c7b3989bd4b2..2d75ff742783 100644
+--- a/arch/m68k/include/asm/traps.h
++++ b/arch/m68k/include/asm/traps.h
+@@ -233,6 +233,17 @@ struct frame {
+ 		    unsigned long  pd2;      /* push data 2*/
+ 		    unsigned long  pd3;      /* push data 3*/
+ 	    } fmt7;
++	    struct {
++		    unsigned short ssw;      /* special status word */
++		    unsigned long  daddr;    /* fault address */
++		    unsigned short reserved1;
++		    unsigned short dobuf;    /* data output buffer */
++		    unsigned short reserved2;
++		    unsigned short dibuf;    /* data input buffer */
++		    unsigned short reserved3;
++		    unsigned short iobuf;    /* instruction input buffer */
++		    unsigned short int1[16]; /* internal registers */
++	    } fmt8;
+ 	    struct {
+ 		    unsigned long  iaddr;    /* instruction address */
+ 		    unsigned short int1[4];  /* internal registers */
+diff --git a/arch/m68k/kernel/setup_no.c b/arch/m68k/kernel/setup_no.c
+index f724875b15cc..283a03ecccbb 100644
+--- a/arch/m68k/kernel/setup_no.c
++++ b/arch/m68k/kernel/setup_no.c
+@@ -55,7 +55,9 @@ void (*mach_reset)(void);
+ void (*mach_halt)(void);
+ 
+ #ifdef CONFIG_M68000
+-#if defined(CONFIG_M68328)
++#if defined(CONFIG_M68010)
++#define CPU_NAME	"MC68010"
++#elif defined(CONFIG_M68328)
+ #define CPU_NAME	"MC68328"
+ #elif defined(CONFIG_M68EZ328)
+ #define CPU_NAME	"MC68EZ328"
+diff --git a/arch/m68k/kernel/signal.c b/arch/m68k/kernel/signal.c
+index e628b859ef21..570e88b632fe 100644
+--- a/arch/m68k/kernel/signal.c
++++ b/arch/m68k/kernel/signal.c
+@@ -192,17 +192,31 @@ void ret_from_user_rt_signal(void);
+ 
+ static inline int frame_extra_sizes(int f)
+ {
++#ifdef CONFIG_M68010
++	/* MC68010 has the four-word frame and the 29-word fault frame. */
++	switch (f) {
++	case 0:
++		return 0;
++	case 8:
++		return sizeof_field(struct frame, un.fmt8);
++	default:
++		return -1;
++	}
++#else
+ 	/* No frame size adjustments required on non-MMU CPUs */
+ 	return 0;
++#endif
+ }
+ 
+ static inline void adjustformat(struct pt_regs *regs)
+ {
++#ifndef CONFIG_M68010
+ 	/*
+ 	 * set format byte to make stack appear modulo 4, which it will
+ 	 * be when doing the rte
+ 	 */
+ 	regs->format = 0x4;
++#endif
+ }
+ 
+ static inline void save_a5_state(struct sigcontext *sc, struct pt_regs *regs)
+diff --git a/arch/m68k/kernel/traps.c b/arch/m68k/kernel/traps.c
+index 60759ba3cbd4..eee01aade93c 100644
+--- a/arch/m68k/kernel/traps.c
++++ b/arch/m68k/kernel/traps.c
+@@ -781,6 +781,13 @@ asmlinkage void buserr_c(struct frame *fp)
+ #endif /* CONFIG_COLDFIRE && CONFIG_MMU */
+ 
+ 	switch (fp->ptregs.format) {
++#ifdef CONFIG_M68010
++	case 8:				/* MC68010 bus error */
++		die_if_kernel("bus error", &fp->ptregs, 0);
++		force_sig_fault(SIGBUS, BUS_ADRERR,
++				(void __user *)fp->un.fmt8.daddr);
++		break;
++#endif
+ #if defined (CONFIG_M68060)
+ 	case 4:				/* 68060 access error */
+ 	  access_error060 (fp);
+@@ -890,6 +897,11 @@ void show_registers(struct pt_regs *regs)
+ 			fp->un.fmt7.pd3);
+ 		addr += sizeof(fp->un.fmt7);
+ 		break;
++	case 0x8:
++		pr_cont("ssw=%04x daddr=%08lx\n",
++			fp->un.fmt8.ssw, fp->un.fmt8.daddr);
++		addr += sizeof(fp->un.fmt8);
++		break;
+ 	case 0x9:
+ 		pr_cont("instr addr=%08lx\n", fp->un.fmt9.iaddr);
+ 		addr += sizeof(fp->un.fmt9);
+@@ -1111,6 +1123,9 @@ asmlinkage void trap_c(struct frame *fp)
+ 	    case 7:
+ 		addr = (void __user *) fp->un.fmt7.effaddr;
+ 		break;
++	    case 8:
++		addr = (void __user *) fp->un.fmt8.daddr;
++		break;
+ 	    case 9:
+ 		addr = (void __user *) fp->un.fmt9.iaddr;
+ 		break;
+diff --git a/block/fops.c b/block/fops.c
+index d077690663ea..64f35f999689 100644
+--- a/block/fops.c
++++ b/block/fops.c
+@@ -397,6 +397,9 @@ static ssize_t blkdev_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
+ 	struct block_device *bdev = I_BDEV(iocb->ki_filp->f_mapping->host);
+ 	unsigned int nr_pages;
+ 
++	if (IS_ENABLED(CONFIG_ROSCO_M68K_ROMFS_POC))
++		return -EOPNOTSUPP;
++
+ 	if (!iov_iter_count(iter))
+ 		return 0;
+ 
+@@ -736,6 +739,9 @@ static ssize_t blkdev_write_iter(struct kiocb *iocb, struct iov_iter *from)
+ 	size_t shorted = 0;
+ 	ssize_t ret;
+ 
++	if (IS_ENABLED(CONFIG_ROSCO_M68K_ROMFS_POC))
++		return -EROFS;
++
+ 	if (bdev_read_only(bdev))
+ 		return -EPERM;
+ 
+@@ -954,7 +960,10 @@ const struct file_operations def_blk_fops = {
+ 
+ static __init int blkdev_init(void)
+ {
+-	return bioset_init(&blkdev_dio_pool, 4,
++	if (IS_ENABLED(CONFIG_ROSCO_M68K_ROMFS_POC))
++		return 0;
++
++	return bioset_init(&blkdev_dio_pool, IS_ENABLED(CONFIG_BASE_SMALL) ? 1 : 4,
+ 				offsetof(struct blkdev_dio, bio),
+ 				BIOSET_NEED_BVECS|BIOSET_PERCPU_CACHE);
+ }
+diff --git a/drivers/mmc/core/block.c b/drivers/mmc/core/block.c
+index e760d13ee325..ee10da678698 100644
+--- a/drivers/mmc/core/block.c
++++ b/drivers/mmc/core/block.c
+@@ -2572,7 +2572,7 @@ static struct mmc_blk_data *mmc_blk_alloc_req(struct mmc_card *card,
+ 
+ 	string_get_size((u64)size, 512, STRING_UNITS_2,
+ 			cap_str, sizeof(cap_str));
+-	pr_info("%s: %s %s %s%s\n",
++	pr_notice("%s: %s %s %s%s\n",
+ 		md->disk->disk_name, mmc_card_id(card), mmc_card_name(card),
+ 		cap_str, md->read_only ? " (ro)" : "");
+ 
+diff --git a/drivers/mmc/core/bus.c b/drivers/mmc/core/bus.c
+index 92ad39c0cabc..580840cf0e1b 100644
+--- a/drivers/mmc/core/bus.c
++++ b/drivers/mmc/core/bus.c
+@@ -366,7 +366,7 @@ int mmc_add_card(struct mmc_card *card)
+ 		uhs_bus_speed_mode = uhs_speeds[card->sd_bus_speed];
+ 
+ 	if (mmc_host_is_spi(card->host))
+-		pr_info("%s: new %s%s card on SPI\n",
++		pr_notice("%s: new %s%s card on SPI\n",
+ 			mmc_hostname(card->host), speed_mode, type);
+ 	else
+ 		pr_info("%s: new %s%s%s card at address %04x\n",
+diff --git a/drivers/mmc/core/queue.c b/drivers/mmc/core/queue.c
+index 5d187e063da8..ff5a52d742dd 100644
+--- a/drivers/mmc/core/queue.c
++++ b/drivers/mmc/core/queue.c
+@@ -419,7 +419,7 @@ static inline bool mmc_merge_capable(struct mmc_host *host)
+ }
+ 
+ /* Set queue depth to get a reasonable value for q->nr_requests */
+-#define MMC_QUEUE_DEPTH 64
++#define MMC_QUEUE_DEPTH (IS_ENABLED(CONFIG_BASE_SMALL) ? 4 : 64)
+ 
+ /**
+  * mmc_init_queue - initialise a queue structure.
+diff --git a/drivers/tty/n_tty.c b/drivers/tty/n_tty.c
+index e6a0f5b40d0a..92282b42f42a 100644
+--- a/drivers/tty/n_tty.c
++++ b/drivers/tty/n_tty.c
+@@ -56,7 +56,7 @@
+  */
+ #define WAKEUP_CHARS 256
+ 
+-#define N_TTY_BUF_SIZE 4096
++#define N_TTY_BUF_SIZE (IS_ENABLED(CONFIG_BASE_SMALL) ? 1024 : 4096)
+ 
+ /*
+  * This defines the low- and high-watermarks for throttling and
+diff --git a/drivers/tty/serial/sccnxp.c b/drivers/tty/serial/sccnxp.c
+index cb31e3aceb62..c06e4f04d54d 100644
+--- a/drivers/tty/serial/sccnxp.c
++++ b/drivers/tty/serial/sccnxp.c
+@@ -94,6 +94,7 @@
+ 
+ #define SCCNXP_HAVE_IO		0x00000001
+ #define SCCNXP_HAVE_MR0		0x00000002
++#define SCCNXP_HAVE_EXT_BRG	0x00000004
+ 
+ struct sccnxp_chip {
+ 	const char		*name;
+@@ -219,6 +220,17 @@ static const struct sccnxp_chip sc68692 = {
+ 	.trwd		= 200,
+ };
+ 
++static const struct sccnxp_chip xr68c681 = {
++	.name		= "XR68C681",
++	.nr		= 2,
++	.freq_min	= 1000000,
++	.freq_std	= 3686400,
++	.freq_max	= 4000000,
++	.flags		= SCCNXP_HAVE_IO | SCCNXP_HAVE_EXT_BRG,
++	.fifosize	= 3,
++	.trwd		= 200,
++};
++
+ static u8 sccnxp_read(struct uart_port *port, u8 reg)
+ {
+ 	struct sccnxp_port *s = dev_get_drvdata(port->dev);
+@@ -299,6 +311,48 @@ static const struct {
+ 	{ 0, 0, 0, 0 }
+ };
+ 
++/* XR68C681 data sheet, table 9: ACR[7] = 1, X = per-channel BRG extension. */
++static const struct {
++	unsigned int baud;
++	u8 csr;
++	bool extended;
++} baud_xr68c681[] = {
++	{ 50, 0, true }, { 75, 0, false }, { 110, 1, false },
++	{ 134, 2, false }, { 150, 3, false }, { 200, 3, true },
++	{ 300, 4, false }, { 600, 5, false }, { 1200, 6, false },
++	{ 2000, 7, false }, { 2400, 8, false }, { 3600, 4, true },
++	{ 4800, 9, false }, { 7200, 10, true }, { 9600, 11, false },
++	{ 14400, 5, true }, { 19200, 12, false }, { 28800, 6, true },
++	{ 38400, 12, true }, { 57600, 7, true }, { 115200, 8, true },
++};
++
++static int sccnxp_set_baud_xr68c681(struct uart_port *port, int baud)
++{
++	struct sccnxp_port *s = dev_get_drvdata(port->dev);
++	int i, best = 0, besterr = INT_MAX, actual = 0;
++
++	for (i = 0; i < ARRAY_SIZE(baud_xr68c681); i++) {
++		int rate = DIV_ROUND_CLOSEST(port->uartclk,
++				DIV_ROUND_CLOSEST(s->chip->freq_std,
++						 baud_xr68c681[i].baud));
++
++		if (!sccnxp_update_best_err(baud, rate, &besterr)) {
++			best = i;
++			actual = rate;
++		}
++	}
++
++	/* The shared counter/timer remains available to the platform. */
++	sccnxp_write(port, SCCNXP_ACR_REG, s->pdata.acr_fixed | ACR_BAUD1);
++	sccnxp_port_write(port, SCCNXP_CR_REG,
++			  baud_xr68c681[best].extended ? 0x80 : 0x90);
++	sccnxp_port_write(port, SCCNXP_CR_REG,
++			  baud_xr68c681[best].extended ? 0xa0 : 0xb0);
++	sccnxp_port_write(port, SCCNXP_CSR_REG,
++			  baud_xr68c681[best].csr * 0x11);
++	return actual;
++}
++
+ static int sccnxp_set_baud(struct uart_port *port, int baud)
+ {
+ 	struct sccnxp_port *s = dev_get_drvdata(port->dev);
+@@ -306,6 +360,9 @@ static int sccnxp_set_baud(struct uart_port *port, int baud)
+ 	struct sccnxp_chip *chip = s->chip;
+ 	u8 i, acr = 0, csr = 0, mr0 = 0;
+ 
++	if (chip->flags & SCCNXP_HAVE_EXT_BRG)
++		return sccnxp_set_baud_xr68c681(port, baud);
++
+ 	/* Find divisor to load to the timer preset registers */
+ 	div_std = DIV_ROUND_CLOSEST(port->uartclk, 2 * 16 * baud);
+ 	if ((div_std >= 2) && (div_std <= 0xffff)) {
+@@ -350,12 +407,22 @@ static int sccnxp_set_baud(struct uart_port *port, int baud)
+ 	return bestbaud;
+ }
+ 
++static void sccnxp_write_imr(struct uart_port *port)
++{
++	struct sccnxp_port *s = dev_get_drvdata(port->dev);
++
++	if (s->pdata.write_imr)
++		s->pdata.write_imr(port->dev, s->imr);
++	else
++		sccnxp_write(port, SCCNXP_IMR_REG, s->imr);
++}
++
+ static void sccnxp_enable_irq(struct uart_port *port, int mask)
+ {
+ 	struct sccnxp_port *s = dev_get_drvdata(port->dev);
+ 
+ 	s->imr |= mask << (port->line * 4);
+-	sccnxp_write(port, SCCNXP_IMR_REG, s->imr);
++	sccnxp_write_imr(port);
+ }
+ 
+ static void sccnxp_disable_irq(struct uart_port *port, int mask)
+@@ -363,7 +430,7 @@ static void sccnxp_disable_irq(struct uart_port *port, int mask)
+ 	struct sccnxp_port *s = dev_get_drvdata(port->dev);
+ 
+ 	s->imr &= ~(mask << (port->line * 4));
+-	sccnxp_write(port, SCCNXP_IMR_REG, s->imr);
++	sccnxp_write_imr(port);
+ }
+ 
+ static void sccnxp_set_bit(struct uart_port *port, int sig, int state)
+@@ -708,7 +775,8 @@ static void sccnxp_set_termios(struct uart_port *port,
+ 	/* Setup baudrate */
+ 	baud = uart_get_baud_rate(port, termios, old, 50,
+ 				  (s->chip->flags & SCCNXP_HAVE_MR0) ?
+-				  230400 : 38400);
++				  230400 : (s->chip->flags & SCCNXP_HAVE_EXT_BRG) ?
++				  115200 : 38400);
+ 	baud = sccnxp_set_baud(port, baud);
+ 
+ 	/* Update timeout according to new baud rate */
+@@ -876,6 +944,7 @@ static const struct platform_device_id sccnxp_id_table[] = {
+ 	{ .name = "sc28202",	.driver_data = (kernel_ulong_t)&sc28202, },
+ 	{ .name = "sc68681",	.driver_data = (kernel_ulong_t)&sc68681, },
+ 	{ .name = "sc68692",	.driver_data = (kernel_ulong_t)&sc68692, },
++	{ .name = "xr68c681",	.driver_data = (kernel_ulong_t)&xr68c681, },
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(platform, sccnxp_id_table);
+@@ -997,10 +1066,14 @@ static int sccnxp_probe(struct platform_device *pdev)
+ 
+ 	/* Disable interrupts */
+ 	s->imr = 0;
+-	sccnxp_write(&s->port[0], SCCNXP_IMR_REG, 0);
++	sccnxp_write_imr(&s->port[0]);
+ 
+ 	if (!s->poll) {
+-		ret = devm_request_threaded_irq(&pdev->dev, s->irq, NULL,
++		if (s->pdata.shared_irq)
++			ret = devm_request_irq(&pdev->dev, s->irq, sccnxp_ist,
++					       IRQF_SHARED, dev_name(&pdev->dev), s);
++		else
++			ret = devm_request_threaded_irq(&pdev->dev, s->irq, NULL,
+ 						sccnxp_ist,
+ 						IRQF_TRIGGER_FALLING |
+ 						IRQF_ONESHOT,
+diff --git a/drivers/tty/serial/serial_core.c b/drivers/tty/serial/serial_core.c
+index 6332ed545c89..8898fe7d2952 100644
+--- a/drivers/tty/serial/serial_core.c
++++ b/drivers/tty/serial/serial_core.c
+@@ -2545,7 +2545,7 @@ uart_report_port(struct uart_driver *drv, struct uart_port *port)
+ 
+ 	uart_get_ioinfos(port, ioinfos, sizeof(ioinfos));
+ 
+-	pr_info("%s%s%s%s (irq = %u, base_baud = %u) is a %s\n",
++	pr_notice("%s%s%s%s (irq = %u, base_baud = %u) is a %s\n",
+ 		port->dev ? dev_name(port->dev) : "",
+ 		port->dev ? ": " : "",
+ 		port->name, ioinfos, port->irq, port->uartclk / 16, uart_type(port));
+diff --git a/fs/iomap/direct-io.c b/fs/iomap/direct-io.c
+index 45bb24934f3d..873441ecde3e 100644
+--- a/fs/iomap/direct-io.c
++++ b/fs/iomap/direct-io.c
+@@ -1065,7 +1065,11 @@ EXPORT_SYMBOL_GPL(__iomap_dio_read_simple);
+ 
+ static int __init iomap_dio_init(void)
+ {
+-	return bioset_init(&iomap_dio_simple_pool, 4,
++	if (IS_ENABLED(CONFIG_ROSCO_M68K_ROMFS_POC))
++		return 0;
++
++	return bioset_init(&iomap_dio_simple_pool,
++			   IS_ENABLED(CONFIG_BASE_SMALL) ? 1 : 4,
+ 			   offsetof(struct iomap_dio_simple, bio),
+ 			   BIOSET_NEED_BVECS | BIOSET_PERCPU_CACHE);
+ }
+diff --git a/fs/iomap/ioend.c b/fs/iomap/ioend.c
+index 92b89fbf95b9..9589508d36ee 100644
+--- a/fs/iomap/ioend.c
++++ b/fs/iomap/ioend.c
+@@ -568,9 +568,13 @@ EXPORT_SYMBOL_GPL(iomap_bounce_read_end_io);
+ 
+ static int __init iomap_ioend_init(void)
+ {
+-	const unsigned int nr_mempool_entries = 4 * (PAGE_SIZE / SECTOR_SIZE);
++	const unsigned int nr_mempool_entries = IS_ENABLED(CONFIG_BASE_SMALL) ?
++		1 : 4 * (PAGE_SIZE / SECTOR_SIZE);
+ 	int error;
+ 
++	if (IS_ENABLED(CONFIG_ROSCO_M68K_ROMFS_POC))
++		return 0;
++
+ 	error = bioset_init(&iomap_ioend_bioset, nr_mempool_entries,
+ 			   offsetof(struct iomap_ioend, io_bio),
+ 			   BIOSET_NEED_BVECS);
+diff --git a/include/asm-generic/sections.h b/include/asm-generic/sections.h
+index 0755bc39b0d8..be16334cd2f0 100644
+--- a/include/asm-generic/sections.h
++++ b/include/asm-generic/sections.h
+@@ -208,11 +208,13 @@ static inline bool is_kernel_inittext(unsigned long addr)
+  * Returns: true if the address is located in .text, false otherwise.
+  * Note: an internal helper, only check the range of _stext to _etext.
+  */
++#ifndef __is_kernel_text
+ static inline bool __is_kernel_text(unsigned long addr)
+ {
+ 	return addr >= (unsigned long)_stext &&
+ 	       addr < (unsigned long)_etext;
+ }
++#endif
+ 
+ /**
+  * __is_kernel - checks if the pointer address is located in the kernel range
+@@ -224,6 +226,7 @@ static inline bool __is_kernel_text(unsigned long addr)
+  *       and range from __init_begin to __init_end, which can be outside
+  *       of the _stext to _end range.
+  */
++#ifndef __is_kernel
+ static inline bool __is_kernel(unsigned long addr)
+ {
+ 	return ((addr >= (unsigned long)_stext &&
+@@ -231,5 +234,6 @@ static inline bool __is_kernel(unsigned long addr)
+ 		(addr >= (unsigned long)__init_begin &&
+ 		 addr < (unsigned long)__init_end));
+ }
++#endif
+ 
+ #endif /* _ASM_GENERIC_SECTIONS_H_ */
+diff --git a/include/linux/platform_data/serial-sccnxp.h b/include/linux/platform_data/serial-sccnxp.h
+index dc670f24e710..6f32ffd680ef 100644
+--- a/include/linux/platform_data/serial-sccnxp.h
++++ b/include/linux/platform_data/serial-sccnxp.h
+@@ -10,6 +10,8 @@
+ #ifndef _PLATFORM_DATA_SERIAL_SCCNXP_H_
+ #define _PLATFORM_DATA_SERIAL_SCCNXP_H_
+ 
++struct device;
++
+ #define SCCNXP_MAX_UARTS	2
+ 
+ /* Output lines */
+@@ -79,6 +81,11 @@ struct sccnxp_pdata {
+ 	const u32		mctrl_cfg[SCCNXP_MAX_UARTS];
+ 	/* Timer value for polling mode (usecs) */
+ 	const unsigned int	poll_time_us;
++	/* XR68C681: non-baud ACR bits owned by the platform's timer/GPIO. */
++	const u8		acr_fixed;
++	/* Shared MMIO interrupt: callback merges UART bits with other users. */
++	void (*write_imr)(struct device *dev, u8 mask);
++	bool			shared_irq;
+ };
+ 
+ #endif
+diff --git a/init/Kconfig b/init/Kconfig
+index 046ae0bf1186..ea0125ddff41 100644
+--- a/init/Kconfig
++++ b/init/Kconfig
+@@ -612,6 +612,7 @@ config IKHEADERS
+ 
+ config LOG_BUF_SHIFT
+ 	int "Kernel log buffer size (16 => 64KB, 17 => 128KB)"
++	range 10 25 if BASE_SMALL
+ 	range 12 25
+ 	default 17
+ 	depends on PRINTK
+@@ -620,6 +621,8 @@ config LOG_BUF_SHIFT
+ 	  The final size is affected by LOG_CPU_MAX_BUF_SHIFT config
+ 	  parameter, see below. Any higher size also might be forced
+ 	  by "log_buf_len" boot parameter.
++	  BASE_SMALL permits smaller buffers to conserve RAM. These retain
++	  fewer messages and truncate long records more aggressively.
+ 
+ 	  Examples:
+ 		     17 => 128 KB
+diff --git a/init/do_mounts.c b/init/do_mounts.c
+index 95e0b3a0f711..8a5a4204dfcb 100644
+--- a/init/do_mounts.c
++++ b/init/do_mounts.c
+@@ -161,11 +161,10 @@ static int __init do_mount_root(const char *name, const char *fs,
+ 	init_chdir("/root");
+ 	s = current->fs->pwd.dentry->d_sb;
+ 	ROOT_DEV = s->s_dev;
+-	printk(KERN_INFO
+-	       "VFS: Mounted root (%s filesystem)%s on device %u:%u.\n",
+-	       s->s_type->name,
+-	       sb_rdonly(s) ? " readonly" : "",
+-	       MAJOR(ROOT_DEV), MINOR(ROOT_DEV));
++	pr_notice("VFS: Mounted root (%s filesystem)%s on device %u:%u.\n",
++		  s->s_type->name,
++		  sb_rdonly(s) ? " readonly" : "",
++		  MAJOR(ROOT_DEV), MINOR(ROOT_DEV));
+ 
+ out:
+ 	kfree(data_page);
+diff --git a/init/main.c b/init/main.c
+index 31f2bf54976a..3364489eaceb 100644
+--- a/init/main.c
++++ b/init/main.c
+@@ -1474,7 +1474,7 @@ static int run_init_process(const char *init_filename)
+ 	const char *const *p;
+ 
+ 	argv_init[0] = init_filename;
+-	pr_info("Run %s as init process\n", init_filename);
++	pr_notice("Run %s as init process\n", init_filename);
+ 	pr_debug("  with arguments:\n");
+ 	for (p = argv_init; *p; p++)
+ 		pr_debug("    %s\n", *p);
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 12fac9084c48..7ad17f87146c 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -6730,11 +6730,18 @@ void calculate_min_free_kbytes(void)
+ 	lowmem_kbytes = nr_free_buffer_pages() * (PAGE_SIZE >> 10);
+ 	new_min_free_kbytes = int_sqrt(lowmem_kbytes * 16);
+ 
+-	if (new_min_free_kbytes > user_min_free_kbytes)
++	if (new_min_free_kbytes > user_min_free_kbytes) {
+ 		min_free_kbytes = clamp(new_min_free_kbytes, 128, 262144);
+-	else
++		/* A 128 KiB floor can consume most of a small NOMMU system. */
++		if (!IS_ENABLED(CONFIG_MMU))
++			min_free_kbytes = min_t(unsigned long, min_free_kbytes,
++				max_t(unsigned long, PAGE_SIZE >> 10,
++				      lowmem_kbytes /
++				      (IS_ENABLED(CONFIG_BASE_SMALL) ? 64 : 16)));
++	} else {
+ 		pr_warn_ratelimited("min_free_kbytes is not updated to %d because user defined value %d is preferred\n",
+ 				    new_min_free_kbytes, user_min_free_kbytes);
++	}
+ 
+ }
+ 

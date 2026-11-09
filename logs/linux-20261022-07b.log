@@ -1,0 +1,217 @@
+Kernel received okay; Starting...
+
+
+ROSCO-RAM-READY
+
+[host: CRC-checked 697808 bytes; 0 retries]
+
+RAM loader: entering Linux
+Linux version 7.3.0-rosco+ (rosco@linux) (m68k-linux-gnu-gcc (GCC) 15.2.0, GNU ld (GNU Binutils) 2.42) #1 2026-10-22 04:53:14 UTC
+printk: legacy bootconsole [earlyrosco0] enabled
+uClinux with CPU MC68010
+Flat model support (C) 1998,1999 Kenneth Albanowski, D. Jeff Dionne
+Zone ranges:
+  DMA      [mem 0x0000000000000000-0x00000000000fffff]
+  Normal   empty
+Movable zone start for each node
+Early memory node ranges
+  node   0: [mem 0x0000000000000000-0x00000000000fffff]
+Initmem setup node 0 [mem 0x0000000000000000-0x00000000000fffff]
+Kernel command line: console=ttySC0,115200 loglevel=8 panic=0 dhash_entries=128 ihash_entries=128 mhash_entries=64 mphash_entries=64 root=/dev/mmcblk0 rootfstype=romfs ro rootwait init=/init
+printk: log buffer data + meta data: 4096 + 12800 = 16896 bytes
+Dentry cache hash table entries: 128 (order: 0, 512 bytes, linear)
+Inode-cache hash table entries: 128 (order: 0, 512 bytes, linear)
+Built 1 zonelists, mobility grouping off.  Total pages: 256
+mem auto-init: stack:off, heap alloc:off, heap free:off
+SLUB: HWalign=16, Order=0-1, MinObjects=0, CPUs=1, Nodes=1
+NR_IRQS: 32
+clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 76450417851000000 ns
+Calibrating delay loop... 0.78 BogoMIPS (lpj=15680)
+pid_max: default: 4096 minimum: 301
+Mount-cache hash table entries: 64 (order: 0, 256 bytes, linear)
+Mountpoint-cache hash table entries: 64 (order: 0, 256 bytes, linear)
+VFS: Finished mounting rootfs on nullfs
+bringup: vfs caches ready
+bringup: rest_init
+bringup: cloned init: 1
+bringup: cloned kthreadd: 2
+bringup: kernel_init_freeable
+Memory: 88K/1024K available (479K kernel code, 58K rwdata, 88K rodata, 56K init, 23K bss, 756K reserved, 0K cma-reserved)
+swapper/0 invoked oom-killer: gfp_mask=0x40cc0(GFP_KERNEL|__GFP_COMP), order=0, oom_score_adj=0
+CPU: 0 UID: 0 PID: 1 Comm: swapper/0 Not tainted 7.3.0-rosco+ #1 NONE 
+Stack from 000e6c90:
+        000e6c90 0007fd34 0007fd34 00091390 00000840 00003884 0007fd34 0000265a
+        00091390 00091180 00e29858 00e52c5e 00e6d820 000e6cf4 00000000 00000000
+        000e6cf4 00e5fe5e 000e6d5c 00040cc0 000e6d42 00e29858 00000000 00000000
+        00000000 000e6d80 00e2bff2 000e6d5c ffffffff 00000001 00000001 00000000
+        00000001 000e6e18 000e0180 0002b066 000a951c 00000000 0009d47c 00000000
+        00000400 00000000 ffffe313 001408c0 00000009 d47c0000 00000009 d47c0000
+Call Trace:
+        [<00003884>] 0x00003884
+ [<0000265a>] 0x0000265a
+ [<00e29858>] 0x00e29858
+ [<00e52c5e>] 0x00e52c5e
+ [<00e6d820>] 0x00e6d820
+
+        [<00e5fe5e>] 0x00e5fe5e
+ [<00040cc0>] 0x00040cc0
+ [<00e29858>] 0x00e29858
+ [<00e2bff2>] 0x00e2bff2
+ [<0002b066>] 0x0002b066
+
+        [<00010000>] 0x00010000
+ [<00040cc0>] 0x00040cc0
+ [<0002b0dc>] 0x0002b0dc
+ [<00040cc0>] 0x00040cc0
+ [<00040cc0>] 0x00040cc0
+
+        [<0002b186>] 0x0002b186
+ [<00040cc0>] 0x00040cc0
+ [<00e6770e>] 0x00e6770e
+ [<0002b796>] 0x0002b796
+ [<0002b872>] 0x0002b872
+
+        [<000223ba>] 0x000223ba
+ [<000223ba>] 0x000223ba
+ [<0002240c>] 0x0002240c
+ [<0002242e>] 0x0002242e
+ [<000221de>] 0x000221de
+
+        [<000221f2>] 0x000221f2
+ [<00e5cef2>] 0x00e5cef2
+ [<000221de>] 0x000221de
+ [<000221f2>] 0x000221f2
+ [<0000220c>] 0x0000220c
+
+        [<000a7c04>] 0x000a7c04
+ [<0009e88a>] 0x0009e88a
+ [<0000220c>] 0x0000220c
+ [<0000220c>] 0x0000220c
+ [<00073118>] 0x00073118
+
+        [<00050005>] 0x00050005
+ [<0009ebc6>] 0x0009ebc6
+ [<00073118>] 0x00073118
+ [<0009ec44>] 0x0009ec44
+ [<000a7bec>] 0x000a7bec
+
+        [<000769bc>] 0x000769bc
+ [<000769d6>] 0x000769d6
+ [<000040e8>] 0x000040e8
+
+Mem-Info:
+active_anon:0 inactive_anon:0 isolated_anon:0
+ active_file:0 inactive_file:0 isolated_file:0
+ unevictable:0 dirty:0 writeback:0
+ slab_reclaimable:0 slab_unreclaimable:47
+ mapped:0 shmem:0 pagetables:0
+ sec_pagetables:0 bounce:0
+ kernel_misc_reclaimable:0
+ free:4 free_pcp:0 free_cma:0
+Node 0 active_anon:0kB inactive_anon:0kB active_file:0kB inactive_file:0kB unevictable:0kB isolated(anon):0kB isolated(file):0kB mapped:0kB dirty:0kB writeback:0kB shmem:0kB kernel_stack:56kB pagetables:0kB sec_pagetables:0kB all_unreclaimable? no Balloon:0kB gpu_active:0kB gpu_reclaim:0kB
+DMA free:16kB boost:0kB min:16kB low:20kB high:24kB reserved_highatomic:0kB free_highatomic:0kB active_anon:0kB inactive_anon:0kB active_file:0kB inactive_file:0kB unevictable:0kB writepending:0kB zspages:0kB present:1024kB managed:268kB mlocked:0kB bounce:0kB free_pcp:0kB local_pcp:0kB free_cma:0kB
+lowmem_reserve[]: 0 0 0
+DMA: 0*4kB 0*8kB 1*16kB (U) 0*32kB 0*64kB 0*128kB 0*256kB 0*512kB 0*1024kB = 16kB
+0 total pagecache pages
+256 pages RAM
+0 pages HighMem/MovableOnly
+189 pages reserved
+Tasks state (memory values in pages):
+[  pid  ]   uid  tgid total_vm      rss rss_anon rss_file rss_shmem pgtables_bytes swapents oom_score_adj name
+Out of memory and no killable processes...
+Kernel panic - not syncing: System is deadlocked on memory
+---[ end Kernel panic - not syncing: System is deadlocked on memory ]---
+
+[tick pc/jiffies/pid/free/isr] 00001764 ffffe331 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 ffffe3ae 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 ffffe42b 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 ffffe4a8 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 ffffe525 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 ffffe5a2 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 ffffe61f 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 ffffe69c 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001766 ffffe719 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001766 ffffe796 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 ffffe813 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 ffffe890 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 ffffe90d 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001766 ffffe98a 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 ffffea07 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 ffffea84 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 ffffeb01 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 ffffeb7e 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001766 ffffebfb 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 ffffec78 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 ffffecf5 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 ffffed72 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001766 ffffedef 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 ffffee6c 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 ffffeee9 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 ffffef66 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 ffffefe3 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 fffff060 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 fffff0dd 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 fffff15a 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001766 fffff1d7 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 fffff254 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 fffff2d1 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001766 fffff34e 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001766 fffff3cb 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001766 fffff448 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 fffff4c5 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 fffff542 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001766 fffff5bf 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001766 fffff63c 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 fffff6b9 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001766 fffff736 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 fffff7b3 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 fffff830 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 fffff8ad 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001764 fffff92a 00000001 00000004 00000051 
+
+[tick pc/jiffies/pid/free/isr] 00001766 fffff9a7 00000001 00000004 00000051 

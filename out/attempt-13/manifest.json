@@ -1,0 +1,18 @@
+{
+  "experimental": true,
+  "ram_start": 4096,
+  "ram_end": 614744,
+  "ram_bytes": 587236,
+  "flash_start": 14729216,
+  "flash_end": 15201260,
+  "flash_bytes": 472044,
+  "flash_preserve_below": 14729216,
+  "flash_protocol": "WFX2",
+  "selected_sections": 934,
+  "sha256": {
+    "vmlinux": "eaa30ccc96b97f47130d59cf41527a0e657d2552631be7977cce1e0547d4d7d6",
+    "ram.bin": "115556aefebc3aaaea3841d028704ea138c626535cbc25ffa7e0f97fd707d1c0",
+    "flash.bin": "38435938735d621a7df564b991eb8bdf6141fae7689c6f4d8852345018e9e9d1",
+    "vmlinux.lds": "3e079ee3274eabd7f5f9daa1b9be099d800266bb2fd733c81da49c48928da865"
+  }
+}

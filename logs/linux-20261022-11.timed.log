@@ -1,0 +1,57 @@
+    0.001 
+    0.001 RAM loader: entering Linux
+    0.086 Linux version 7.3.0-rosco-02415-g7be4bc52fd9e-dirty (rosco@linux) (m68k-linux-gnu-gcc (GCC) 15.2.0, GNU ld (GNU Binutils) 2.42) #1 2026-10-22 04:53:14 UTC
+    0.086 printk: legacy bootconsole [earlyrosco0] enabled
+    0.086 rosco_m68k R2: MC68010, 1 MiB RAM, split RAM/flash kernel
+    0.086 uClinux with CPU MC68010
+    0.112 Flat model support (C) 1998,1999 Kenneth Albanowski, D. Jeff Dionne
+    0.113 Zone ranges:
+    0.128   DMA      [mem 0x0000000000000000-0x00000000000fffff]
+    0.144   Normal   empty
+    0.160 Movable zone start for each node
+    0.160 Early memory node ranges
+    0.191   node   0: [mem 0x0000000000000000-0x00000000000fffff]
+    0.207 Initmem setup node 0 [mem 0x0000000000000000-0x00000000000fffff]
+    0.402 Kernel command line: console=ttySC0,115200 loglevel=8 panic=0 dhash_entries=128 ihash_entries=128 mhash_entries=64 mphash_entries=64 root=/dev/mmcblk0 \
+    0.402 Kernel command line: rootfstype=romfs ro rootwait init=/init
+    0.582 printk: log buffer data + meta data: 1024 + 3200 = 4224 bytes
+    0.611 Dentry cache hash table entries: 128 (order: 0, 512 bytes, linear)
+    0.635 Inode-cache hash table entries: 128 (order: 0, 512 bytes, linear)
+    0.666 Built 1 zonelists, mobility grouping off.  Total pages: 256
+    0.666 mem auto-init: stack:off, heap alloc:off, heap free:off
+    0.842 SLUB: HWalign=16, Order=0-1, MinObjects=0, CPUs=1, Nodes=1
+    1.034 NR_IRQS: 32
+    1.154 clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 76450417851000000 ns
+    1.746 Calibrating delay loop... 0.78 BogoMIPS (lpj=15680)
+    1.762 pid_max: default: 4096 minimum: 301
+    1.871 Mount-cache hash table entries: 64 (order: 0, 256 bytes, linear)
+    1.896 Mountpoint-cache hash table entries: 64 (order: 0, 256 bytes, linear)
+    2.024 VFS: Finished mounting rootfs on nullfs
+    3.213 Memory: 196K/1024K available (376K kernel code, 51K rwdata, 88K rodata, 56K init, 20K bss, 648K reserved, 0K cma-reserved)
+    5.334 workingset: timestamp_bits=30 (anon: 25) max_order=7 bucket_order=0 (anon: 0)
+    5.366 romfs: ROMFS MTD (C) 2007 Red Hat, Inc.
+    5.414 uart-sccnxp xr68c681: Using default clock frequency
+    5.558 xr68c681: ttySC0 MMIO:0x00f00001 (irq = 5, base_baud = 230400) is a XR68C681
+    5.606 printk: legacy console [ttySC0] enabled
+    5.622 printk: legacy console [ttySC0] enabled
+    5.654 printk: legacy bootconsole [earlyrosco0] disabled
+    5.670 printk: legacy bootconsole [earlyrosco0] disabled
+    5.862 xr68c681: ttySC1 MMIO:0x00f00001 (irq = 5, base_baud = 230400) is a XR68C681
+    6.294 mmc_spi spi0.0: SD/MMC host mmc0, no WP, no poweroff
+    7.381 Waiting for root device /dev/mmcblk0...
+    8.853 mmc0: host does not support reading read-only switch, assuming write-enable
+    8.885 mmc0: new SDHC card on SPI
+    9.254 mmcblk0: mmc0:0000 TSBBH 3.69 GiB
+   13.109 VFS: Mounted root (romfs filesystem) readonly on device 179:0.
+   13.156 VFS: Pivoted into new rootfs
+   13.205 Freeing unused kernel image (initmem) memory: 56K
+   13.253 This architecture does not have kernel memory protection.
+   13.268 Run /init as init process
+   13.300   with arguments:
+   13.317     /init
+   13.332   with environment:
+   13.348     HOME=/
+   13.365     TERM=linux
+   13.540 ROSCO Linux userspace from SD; getpid=0x00000001
+   13.556 userspace read: enter a line
+   13.956 rosco-userspace-uart-syscall-check
